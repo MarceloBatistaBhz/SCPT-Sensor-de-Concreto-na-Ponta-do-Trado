@@ -1,0 +1,52 @@
+● Sketch entregue
+
+  Substituí o MedidorSinalBLE.ino pela versão completa do datalogger. Em ~280 linhas, ele faz:
+
+  ┌─────────────────────────┬────────────────────────────────────────────────────────────────────────────────────────────┐
+  │          Bloco          					  │                                         O que faz                                         																				 │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Driver Keller LD inline 				 │ Lê Pmin/Pmax da EEPROM no boot, depois 0xAC → 9 ms → 5 bytes a cada amostra     			      								                 │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Máquina de estados      				    IDLE → COLLECT → READY → SERVING → IDLE                                          														         │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Lógica 1 Hz / 5 Hz      				  │ Entra em 5 Hz quando ΔP > 0,2 bar, sai depois de 30 s sem spike, cap de 30 min cumulativos											 │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Log LittleFS          					  │ /log.csv formato ms;bar, flush a cada 16 amostras (resiliência a power loss)             														  │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ BLE GATT                				 │ Service custom + characteristics cmd (write) e status (read+notify)                       															 │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Wi-Fi AP sob demanda   			 │ SSID LoggerP_AP aberto, serve http://192.168.4.1/log.csv, auto-off em 60 s          													         │
+  ├─────────────────────────┼────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Auto-recovery           				 │ Se acha /log.csv no boot, vai direto pra READY                                        																         │
+  └─────────────────────────┴────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  Como testar
+
+  1. Compilar — verifique no Arduino IDE:
+  - Board: XIAO_ESP32C3
+  - USB CDC On Boot: Enabled
+  - Partition: Default 4MB with spiffs (precisa de FS pra LittleFS)
+  - NimBLE-Arduino v2.x com CONFIG_BT_NIMBLE_EXT_ADV 1 (já configurado)
+
+  2. Pinagem I²C — XIAO ESP32-C3 default: SDA=D4 (GPIO6), SCL=D5 (GPIO7). É isso que Wire.begin() usa.
+
+  3. Fluxo de teste com nRF Connect (sem precisar de app custom):
+  - Abrir app, escanear, conectar em LoggerP_C3
+  - Achar o serviço 9b78c001-...
+  - Na characteristic CMD (UUID 9b78c002-...): escrever bytes ASCII START
+  - Aguardar coleta (status notifica progresso)
+  - Escrever STOP ou esperar 2h
+  - Escrever DOWNLOAD → status notifica WIFI 192.168.4.1
+  - Conectar o celular no Wi-Fi LoggerP_AP → abrir http://192.168.4.1 no navegador → baixar log.csv
+  - Anexar no WhatsApp normalmente
+
+  Pontos abertos pra refinar depois
+
+  1. Mod do LED da XIAO: cortar trilha do LED de power. Posso te enviar foto/instrução do mod específico se quiser, mas isso é mais um post de fórum do que código.
+  2. Light-sleep automático: ainda não adicionei esp_pm_configure. Sem ele, consumo médio fica ~10 mA durante COLLECT (em vez dos 0,5 mA estimados). Recomendo medir corrente real primeiro (multímetro em série na bateria) e só depois decidir se precisa otimizar — pode
+  ser que o cenário de uso real dê autonomia suficiente sem mexer.
+  3. Mensagem de erro no celular: hoje o status é texto curto. Se quiser, dá pra adicionar codes/error chars dedicados.
+
+  Memória atualizada com tudo: nova natureza do projeto (datalogger), protocolo Keller, e comando UUIDs. Próxima sessão já entra com esse contexto carregado.
+
+  Quando puder testar o build, me diga se compilou sem erro — se aparecer algo, mando correção rápida.

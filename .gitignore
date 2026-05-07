@@ -1,0 +1,19 @@
+# Configuracoes locais do Claude Code (especificas da maquina)
+.claude/
+
+# Build artifacts do Arduino IDE
+build/
+*.bin
+*.elf
+*.hex
+*.map
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Editor
+*.bak
+*.swp
+*~
