@@ -17,3 +17,6 @@ desktop.ini
 *.bak
 *.swp
 *~
+
+# Notas pessoais (prompts, rascunhos)
+prompts SCPT.txt
