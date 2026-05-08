@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0d6efd">
+  <title>Logger Pressao SCPT</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      background: #1a1a1a;
+      color: #f0f0f0;
+      min-height: 100vh;
+    }
+    body {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.25rem;
+      text-align: center;
+      color: #4dabf7;
+      margin-bottom: 0.25rem;
+      font-weight: 600;
+    }
+    .status-card {
+      background: #2a2a2a;
+      border-radius: 12px;
+      padding: 1rem;
+      border-left: 6px solid #6c757d;
+      transition: border-color 0.3s;
+    }
+    .status-card.idle      { border-left-color: #6c757d; }
+    .status-card.collect   { border-left-color: #ffd43b; }
+    .status-card.ready     { border-left-color: #4dabf7; }
+    .status-card.serving   { border-left-color: #cc5de8; }
+    .status-card.discon    { border-left-color: #ff6b6b; }
+    .status-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: #adb5bd;
+      letter-spacing: 1px;
+    }
+    .status-value {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-top: 0.25rem;
+      word-break: break-word;
+    }
+    .btn {
+      width: 100%;
+      padding: 1rem;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.08s;
+      touch-action: manipulation;
+      color: #fff;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-primary   { background: #4dabf7; }
+    .btn-success   { background: #51cf66; color: #1a1a1a; }
+    .btn-warning   { background: #ffd43b; color: #1a1a1a; }
+    .btn-danger    { background: #ff6b6b; }
+    .btn-secondary { background: #495057; }
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    .hint {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      color: #adb5bd;
+      line-height: 1.4;
+    }
+    .hint.visible { border-left: 4px solid #cc5de8; }
+    details {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+    }
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #adb5bd;
+      list-style: none;
+    }
+    summary::after { content: ' v'; }
+    details[open] summary::after { content: ' ^'; }
+    .log {
+      background: #0a0a0a;
+      border-radius: 6px;
+      padding: 0.5rem;
+      font-family: ui-monospace, "Consolas", monospace;
+      font-size: 0.75rem;
+      max-height: 180px;
+      overflow-y: auto;
+      color: #adb5bd;
+      margin-top: 0.5rem;
+    }
+    .log-line { margin-bottom: 0.2rem; word-break: break-all; }
+    .log-line.err { color: #ff6b6b; }
+    .log-line.ok  { color: #51cf66; }
+    .footer {
+      text-align: center;
+      color: #6c757d;
+      font-size: 0.75rem;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Logger Pressao SCPT</h1>
+
+  <div class="status-card discon" id="statusCard">
+    <div class="status-label">Estado</div>
+    <div class="status-value" id="statusValue">Desconectado</div>
+  </div>
+
+  <button class="btn btn-primary" id="btnConnect">Conectar via Bluetooth</button>
+
+  <div class="btn-row">
+    <button class="btn btn-success" id="btnStart"  disabled>Iniciar coleta</button>
+    <button class="btn btn-warning" id="btnStop"   disabled>Parar coleta</button>
+  </div>
+
+  <button class="btn btn-primary"   id="btnDownload" disabled>Preparar download (Wi-Fi)</button>
+
+  <div class="hint" id="wifiHint" hidden>
+    <strong>Proximo passo:</strong> conecte o celular ao Wi-Fi
+    <strong>LoggerP_AP</strong> (sem senha) e toque no botao abaixo.
+  </div>
+
+  <button class="btn btn-secondary" id="btnOpenCsv"  hidden>Abrir log.csv (192.168.4.1)</button>
+  <button class="btn btn-secondary" id="btnStopWifi" disabled>Desligar Wi-Fi</button>
+
+  <details>
+    <summary>Avancado</summary>
+    <button class="btn btn-danger" id="btnErase" style="margin-top: 0.75rem;" disabled>Apagar log atual</button>
+    <div class="log" id="log"></div>
+  </details>
+
+  <p class="footer">v1 &middot; Web Bluetooth PWA &middot; Chrome/Edge no Android</p>
+
+  <script>
+    'use strict';
+
+    const SVC_UUID  = '9b78c001-c0de-4d65-a1aa-001122334455';
+    const CMD_UUID  = '9b78c002-c0de-4d65-a1aa-001122334455';
+    const STAT_UUID = '9b78c003-c0de-4d65-a1aa-001122334455';
+    const CSV_URL   = 'http://192.168.4.1/log.csv';
+
+    const $ = (id) => document.getElementById(id);
+
+    let device   = null;
+    let cmdChar  = null;
+    let statChar = null;
+
+    function logLine(msg, cls) {
+      const el = document.createElement('div');
+      el.className = 'log-line' + (cls ? ' ' + cls : '');
+      const t = new Date().toLocaleTimeString();
+      el.textContent = '[' + t + '] ' + msg;
+      $('log').appendChild(el);
+      $('log').scrollTop = $('log').scrollHeight;
+    }
+
+    function applyState(text) {
+      $('statusValue').textContent = text;
+
+      const card = $('statusCard');
+      let cls = 'idle';
+      if      (text.startsWith('COLL'))  cls = 'collect';
+      else if (text.startsWith('READY')) cls = 'ready';
+      else if (text.startsWith('WIFI'))  cls = 'serving';
+      else if (text === 'Desconectado')  cls = 'discon';
+      card.className = 'status-card ' + cls;
+
+      const isIdle    = (text === 'IDLE');
+      const isCollect = text.startsWith('COLL');
+      const isReady   = text.startsWith('READY');
+      const isServing = text.startsWith('WIFI');
+      const connected = !!cmdChar;
+
+      $('btnStart').disabled    = !connected || !(isIdle || isReady);
+      $('btnStop').disabled     = !connected || !isCollect;
+      $('btnDownload').disabled = !connected || !(isIdle || isReady);
+      $('btnStopWifi').disabled = !connected || !isServing;
+      $('btnErase').disabled    = !connected || !(isIdle || isReady);
+
+      $('btnOpenCsv').hidden = !isServing;
+      $('wifiHint').hidden   = !isServing;
+    }
+
+    async function sendCmd(cmd) {
+      if (!cmdChar) { logLine('Nao conectado', 'err'); return; }
+      try {
+        const data = new TextEncoder().encode(cmd);
+        await cmdChar.writeValueWithResponse(data);
+        logLine('-> ' + cmd, 'ok');
+      } catch (e) {
+        logLine('Erro ao enviar ' + cmd + ': ' + e.message, 'err');
+      }
+    }
+
+    async function connect() {
+      try {
+        logLine('Procurando LoggerP_C3...');
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'LoggerP_C3' }],
+          optionalServices: [SVC_UUID],
+        });
+        device.addEventListener('gattserverdisconnected', onDisconnected);
+
+        logLine('Conectando...');
+        const server = await device.gatt.connect();
+        const svc    = await server.getPrimaryService(SVC_UUID);
+        cmdChar  = await svc.getCharacteristic(CMD_UUID);
+        statChar = await svc.getCharacteristic(STAT_UUID);
+
+        statChar.addEventListener('characteristicvaluechanged', (e) => {
+          const text = new TextDecoder().decode(e.target.value);
+          applyState(text);
+        });
+        await statChar.startNotifications();
+
+        const initial = await statChar.readValue();
+        applyState(new TextDecoder().decode(initial));
+
+        $('btnConnect').textContent = 'Conectado: ' + device.name;
+        $('btnConnect').disabled = true;
+        logLine('Conectado.', 'ok');
+      } catch (e) {
+        logLine('Erro: ' + e.message, 'err');
+      }
+    }
+
+    function onDisconnected() {
+      logLine('Dispositivo desconectado', 'err');
+      cmdChar  = null;
+      statChar = null;
+      $('btnConnect').textContent = 'Conectar via Bluetooth';
+      $('btnConnect').disabled = false;
+      applyState('Desconectado');
+    }
+
+    $('btnConnect').onclick   = connect;
+    $('btnStart').onclick     = () => sendCmd('START');
+    $('btnStop').onclick      = () => sendCmd('STOP');
+    $('btnDownload').onclick  = () => sendCmd('DOWNLOAD');
+    $('btnStopWifi').onclick  = () => sendCmd('STOPWIFI');
+    $('btnErase').onclick     = () => {
+      if (confirm('Apagar log.csv? Acao nao pode ser desfeita.')) sendCmd('ERASE');
+    };
+    $('btnOpenCsv').onclick   = () => window.open(CSV_URL, '_blank', 'noopener');
+
+    if (!navigator.bluetooth) {
+      $('btnConnect').textContent = 'Web Bluetooth nao suportado';
+      $('btnConnect').disabled = true;
+      logLine('Use Chrome ou Edge no Android.', 'err');
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
