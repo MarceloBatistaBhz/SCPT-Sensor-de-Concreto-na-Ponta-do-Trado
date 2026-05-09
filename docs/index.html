@@ -43,6 +43,11 @@
     .status-card.ready     { border-left-color: #4dabf7; }
     .status-card.serving   { border-left-color: #cc5de8; }
     .status-card.discon    { border-left-color: #ff6b6b; }
+    .status-card.reconn    { border-left-color: #ffa94d; animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse {
+      0%, 100% { border-left-color: #ffa94d; }
+      50%      { border-left-color: #ff922b; }
+    }
     .status-label {
       font-size: 0.75rem;
       text-transform: uppercase;
@@ -155,7 +160,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v1 &middot; Web Bluetooth PWA &middot; Chrome/Edge no Android</p>
+  <p class="footer">v2 &middot; Web Bluetooth PWA &middot; auto-reconexao &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -167,9 +172,14 @@
 
     const $ = (id) => document.getElementById(id);
 
-    let device   = null;
-    let cmdChar  = null;
-    let statChar = null;
+    const RECONNECT_INTERVAL_MS = 4000;
+
+    let device         = null;
+    let cmdChar        = null;
+    let statChar       = null;
+    let reconnectTimer = null;   // setInterval id while reconnecting
+    let reconnecting   = false;
+    let wakeLock       = null;   // Wake Lock sentinel
 
     function logLine(msg, cls) {
       const el = document.createElement('div');
@@ -185,10 +195,11 @@
 
       const card = $('statusCard');
       let cls = 'idle';
-      if      (text.startsWith('COLL'))  cls = 'collect';
-      else if (text.startsWith('READY')) cls = 'ready';
-      else if (text.startsWith('WIFI'))  cls = 'serving';
-      else if (text === 'Desconectado')  cls = 'discon';
+      if      (text.startsWith('COLL'))   cls = 'collect';
+      else if (text.startsWith('READY'))  cls = 'ready';
+      else if (text.startsWith('WIFI'))   cls = 'serving';
+      else if (text === 'Reconectando')   cls = 'reconn';
+      else if (text === 'Desconectado')   cls = 'discon';
       card.className = 'status-card ' + cls;
 
       const isIdle    = (text === 'IDLE');
@@ -218,6 +229,48 @@
       }
     }
 
+    // Tenta segurar a tela acesa enquanto a aba esta conectada / reconectando.
+    // Se nao for suportado (ex.: iOS Safari), falha em silencio.
+    async function acquireWakeLock() {
+      try {
+        if ('wakeLock' in navigator && !wakeLock) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => { wakeLock = null; });
+        }
+      } catch (_) { /* ignore */ }
+    }
+    function releaseWakeLock() {
+      if (wakeLock) { try { wakeLock.release(); } catch (_) {} wakeLock = null; }
+    }
+
+    async function bindCharacteristics(server) {
+      const svc = await server.getPrimaryService(SVC_UUID);
+      cmdChar  = await svc.getCharacteristic(CMD_UUID);
+      statChar = await svc.getCharacteristic(STAT_UUID);
+
+      statChar.addEventListener('characteristicvaluechanged', (e) => {
+        const text = new TextDecoder().decode(e.target.value);
+        applyState(text);
+      });
+      await statChar.startNotifications();
+
+      const initial = await statChar.readValue();
+      applyState(new TextDecoder().decode(initial));
+    }
+
+    function setConnectedUi() {
+      $('btnConnect').textContent = 'Conectado: ' + device.name;
+      $('btnConnect').disabled = true;
+    }
+    function setIdleUi() {
+      $('btnConnect').textContent = 'Conectar via Bluetooth';
+      $('btnConnect').disabled = false;
+    }
+    function setReconnectingUi() {
+      $('btnConnect').textContent = 'Reconectando... (toque pra cancelar)';
+      $('btnConnect').disabled = false;
+    }
+
     async function connect() {
       try {
         logLine('Procurando LoggerP_C3...');
@@ -229,37 +282,73 @@
 
         logLine('Conectando...');
         const server = await device.gatt.connect();
-        const svc    = await server.getPrimaryService(SVC_UUID);
-        cmdChar  = await svc.getCharacteristic(CMD_UUID);
-        statChar = await svc.getCharacteristic(STAT_UUID);
-
-        statChar.addEventListener('characteristicvaluechanged', (e) => {
-          const text = new TextDecoder().decode(e.target.value);
-          applyState(text);
-        });
-        await statChar.startNotifications();
-
-        const initial = await statChar.readValue();
-        applyState(new TextDecoder().decode(initial));
-
-        $('btnConnect').textContent = 'Conectado: ' + device.name;
-        $('btnConnect').disabled = true;
+        await bindCharacteristics(server);
+        setConnectedUi();
+        await acquireWakeLock();
         logLine('Conectado.', 'ok');
       } catch (e) {
         logLine('Erro: ' + e.message, 'err');
       }
     }
 
+    async function tryReconnect() {
+      if (!device || !reconnecting) return;
+      try {
+        const server = await device.gatt.connect();
+        await bindCharacteristics(server);
+        stopReconnectLoop();
+        setConnectedUi();
+        logLine('Reconectado.', 'ok');
+      } catch (e) {
+        logLine('Tentativa falhou: ' + e.message, 'err');
+        // continua tentando no proximo tick do interval
+      }
+    }
+
+    function startReconnectLoop() {
+      if (reconnecting) return;
+      reconnecting = true;
+      applyState('Reconectando');
+      setReconnectingUi();
+      logLine('Iniciando reconexao automatica...');
+      acquireWakeLock();
+      tryReconnect();   // primeira tentativa imediata
+      reconnectTimer = setInterval(tryReconnect, RECONNECT_INTERVAL_MS);
+    }
+
+    function stopReconnectLoop() {
+      reconnecting = false;
+      if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
+    }
+
+    function cancelReconnect() {
+      stopReconnectLoop();
+      device = null;
+      releaseWakeLock();
+      setIdleUi();
+      applyState('Desconectado');
+      logLine('Reconexao cancelada.', 'err');
+    }
+
     function onDisconnected() {
       logLine('Dispositivo desconectado', 'err');
       cmdChar  = null;
       statChar = null;
-      $('btnConnect').textContent = 'Conectar via Bluetooth';
-      $('btnConnect').disabled = false;
-      applyState('Desconectado');
+      // Se ainda temos referencia ao device, entra em modo reconexao automatica
+      if (device) {
+        startReconnectLoop();
+      } else {
+        setIdleUi();
+        applyState('Desconectado');
+      }
     }
 
-    $('btnConnect').onclick   = connect;
+    $('btnConnect').onclick = () => {
+      if (reconnecting) return cancelReconnect();
+      if (!device)      return connect();
+      // Tem device mas nao esta conectado nem reconectando — reconecta na hora.
+      startReconnectLoop();
+    };
     $('btnStart').onclick     = () => sendCmd('START');
     $('btnStop').onclick      = () => sendCmd('STOP');
     $('btnDownload').onclick  = () => sendCmd('DOWNLOAD');
