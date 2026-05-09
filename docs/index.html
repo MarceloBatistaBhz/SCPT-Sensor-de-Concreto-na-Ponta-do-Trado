@@ -147,7 +147,18 @@
       color: #adb5bd;
       margin-bottom: 0.6rem;
       font-family: ui-monospace, "Consolas", monospace;
+      line-height: 1.5;
     }
+    .lg-line {
+      display: inline-block;
+      width: 14px;
+      height: 2px;
+      vertical-align: middle;
+      margin-right: 4px;
+      border-radius: 1px;
+    }
+    .lg-blue   { background: #4dabf7; }
+    .lg-orange { background: #ffa94d; }
     .chart-svg {
       background: #0a0a0a;
       border-radius: 6px;
@@ -262,7 +273,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v7.1 &middot; grafico com pinch + pan + reset &middot; Chrome/Edge no Android</p>
+  <p class="footer">v8 &middot; grafico com media movel (50 pts) &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -301,6 +312,7 @@
     const CHART_PAD_B  = 28;
     const CHART_INNER_W = CHART_W - CHART_PAD_L - CHART_PAD_R;
     const CHART_INNER_H = CHART_H - CHART_PAD_T - CHART_PAD_B;
+    const MA_WINDOW    = 50;     // tamanho da janela da media movel
 
     // Chart state
     let chartData      = null;   // { points, pMax, pMaxIdx, tMin, tMax }
@@ -492,6 +504,21 @@
       return m + 'm' + String(s).padStart(2, '0') + 's';
     }
 
+    // Media movel com janela crescente nas primeiras (window-1) amostras:
+    // i=0  -> media de 1 ponto;  i=k<window -> media dos k+1 primeiros;
+    // i>=window -> media dos ultimos `window` pontos. Soma corrente, O(n).
+    function computeMA(points, window) {
+      const ma = new Array(points.length);
+      let sum = 0;
+      for (let i = 0; i < points.length; i++) {
+        sum += points[i][1];
+        if (i >= window) sum -= points[i - window][1];
+        const w = Math.min(i + 1, window);
+        ma[i] = sum / w;
+      }
+      return ma;
+    }
+
     function parseCsvBytes(bytes) {
       const text = new TextDecoder().decode(bytes);
       const lines = text.split('\n');
@@ -513,6 +540,7 @@
       }
       return {
         points,
+        ma: computeMA(points, MA_WINDOW),
         pMax,
         pMaxIdx,
         tMin: points[0][0],
@@ -542,7 +570,7 @@
 
     function drawChart() {
       if (!chartData || !chartView) return;
-      const { points, pMax, pMaxIdx, tMin, tMax } = chartData;
+      const { points, ma, pMax, pMaxIdx, tMin, tMax } = chartData;
       const { xMin, xMax } = chartView;
       const duration = Math.max(1, xMax - xMin);
       const yScale = Math.max(pMax, 0.1);
@@ -557,10 +585,13 @@
       while (lastIdx > 0 && points[lastIdx - 1][0] > xMax) lastIdx--;
 
       let d = '';
+      let dMa = '';
       for (let i = firstIdx; i <= lastIdx; i++) {
         const x = xPx(points[i][0]);
         const y = yPx(points[i][1]);
         d += (i === firstIdx ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+        const yMa = yPx(ma[i]);
+        dMa += (i === firstIdx ? 'M' : 'L') + x.toFixed(1) + ',' + yMa.toFixed(1) + ' ';
       }
 
       // Labels X
@@ -608,6 +639,7 @@
             '.ca{stroke:#495057;stroke-width:1}' +
             '.cl{fill:#adb5bd;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
             '.cline{stroke:#4dabf7;stroke-width:1.5;fill:none;stroke-linejoin:round}' +
+            '.cma{stroke:#ffa94d;stroke-width:1.5;fill:none;stroke-linejoin:round}' +
             '.cdot{fill:#ff6b6b;stroke:#1a1a1a;stroke-width:1}' +
             '.cpklbl{fill:#ff6b6b;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
           '</style>' +
@@ -618,6 +650,7 @@
             (CHART_W - CHART_PAD_R) + '" y2="' + (CHART_H - CHART_PAD_B) + '" class="ca"/>' +
           xLabels.join('') + yLabels.join('') +
           '<path d="' + d + '" class="cline"/>' +
+          '<path d="' + dMa + '" class="cma"/>' +
           peakMark +
         '</svg>';
 
@@ -626,9 +659,13 @@
       const fullRange = tMax - tMin;
       const zoom = fullRange / duration;
       const zoomLabel = zoom > 1.05 ? ' | zoom ' + zoom.toFixed(1) + 'x' : '';
-      $('chartInfo').textContent =
+      const legend =
+        '<span class="lg-line lg-blue"></span> leitura' +
+        ' &nbsp; <span class="lg-line lg-orange"></span> media movel (' + MA_WINDOW + ' pts)';
+      $('chartInfo').innerHTML =
         points.length + ' amostras | pico ' + pMax.toFixed(2) + ' bar | ' +
-        'duracao ' + formatTime(fullRange / 1000) + zoomLabel;
+        'duracao ' + formatTime(fullRange / 1000) + zoomLabel +
+        '<br>' + legend;
     }
 
     function hideChart() {
