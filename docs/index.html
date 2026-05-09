@@ -152,11 +152,20 @@
       background: #0a0a0a;
       border-radius: 6px;
       overflow: hidden;
+      touch-action: none;            /* deixa nossos handlers controlarem zoom/pan */
+      -webkit-user-select: none;
+      user-select: none;
     }
     .chart-svg svg {
       width: 100%;
       height: auto;
       display: block;
+    }
+    .chart-hint {
+      font-size: 0.7rem;
+      color: #6c757d;
+      margin-top: 0.5rem;
+      text-align: center;
     }
     details {
       background: #2a2a2a;
@@ -228,6 +237,7 @@
     </div>
     <div class="chart-info" id="chartInfo"></div>
     <div class="chart-svg" id="chartSvg"></div>
+    <div class="chart-hint">pinca pra zoom &middot; arrasta pra mover &middot; toque duplo pra resetar</div>
   </div>
 
   <details>
@@ -251,7 +261,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v4 &middot; BLE file transfer + grafico &middot; Chrome/Edge no Android</p>
+  <p class="footer">v5 &middot; grafico com zoom interativo &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -280,6 +290,23 @@
     let streamReceived  = 0;
     let streamChunks    = [];
     let streamWatchdog  = null;
+
+    // Chart geometry (hoisted pra ser usado em renderChart e nos handlers de touch)
+    const CHART_W      = 360;
+    const CHART_H      = 220;
+    const CHART_PAD_L  = 40;
+    const CHART_PAD_R  = 12;
+    const CHART_PAD_T  = 10;
+    const CHART_PAD_B  = 28;
+    const CHART_INNER_W = CHART_W - CHART_PAD_L - CHART_PAD_R;
+    const CHART_INNER_H = CHART_H - CHART_PAD_T - CHART_PAD_B;
+
+    // Chart state
+    let chartData      = null;   // { points, pMax, pMaxIdx, tMin, tMax }
+    let chartView      = null;   // { xMin, xMax } — janela visivel atual
+    let chartTouch     = null;   // estado dos toques atuais
+    let chartLastTapMs = 0;
+    let chartRafPend   = false;
 
     function logLine(msg, cls) {
       const el = document.createElement('div');
@@ -464,8 +491,7 @@
       return m + 'm' + String(s).padStart(2, '0') + 's';
     }
 
-    function renderChart(bytes) {
-      // Parse do CSV (formato: "ms;bar\n" + linhas "tempo_ms;valor_bar")
+    function parseCsvBytes(bytes) {
       const text = new TextDecoder().decode(bytes);
       const lines = text.split('\n');
       const points = [];
@@ -479,103 +505,256 @@
         if (!isFinite(ms) || !isFinite(bar)) continue;
         points.push([ms, bar]);
       }
-
-      if (points.length < 2) {
-        $('chartBox').hidden = true;
-        logLine('Grafico: dados insuficientes (' + points.length + ' amostras)', 'err');
-        return;
-      }
-
-      const tMin = points[0][0];
-      const tMax = points[points.length - 1][0];
-      const duration = Math.max(1, tMax - tMin);
-
-      let pMax = -Infinity;
-      let pMaxIdx = 0;
+      if (points.length < 2) return null;
+      let pMax = -Infinity, pMaxIdx = 0;
       for (let i = 0; i < points.length; i++) {
         if (points[i][1] > pMax) { pMax = points[i][1]; pMaxIdx = i; }
       }
-      // Se pMax <= 0, usa 1.0 como escala minima pra nao dividir por zero
+      return {
+        points,
+        pMax,
+        pMaxIdx,
+        tMin: points[0][0],
+        tMax: points[points.length - 1][0]
+      };
+    }
+
+    function renderChart(bytes) {
+      const data = parseCsvBytes(bytes);
+      if (!data) {
+        $('chartBox').hidden = true;
+        logLine('Grafico: dados insuficientes', 'err');
+        return;
+      }
+      chartData = data;
+      chartView = { xMin: data.tMin, xMax: data.tMax };
+      drawChart();
+      $('chartBox').hidden = false;
+      setTimeout(() => $('chartBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+    }
+
+    function scheduleRedraw() {
+      if (chartRafPend) return;
+      chartRafPend = true;
+      requestAnimationFrame(() => { chartRafPend = false; drawChart(); });
+    }
+
+    function drawChart() {
+      if (!chartData || !chartView) return;
+      const { points, pMax, pMaxIdx, tMin, tMax } = chartData;
+      const { xMin, xMax } = chartView;
+      const duration = Math.max(1, xMax - xMin);
       const yScale = Math.max(pMax, 0.1);
 
-      // Geometria do SVG
-      const W = 360, H = 220;
-      const padL = 40, padR = 12, padT = 10, padB = 28;
-      const innerW = W - padL - padR;
-      const innerH = H - padT - padB;
+      const xPx = (ms)  => CHART_PAD_L + ((ms - xMin) / duration) * CHART_INNER_W;
+      const yPx = (bar) => CHART_PAD_T + (1 - Math.max(0, bar) / yScale) * CHART_INNER_H;
 
-      const xPx = (ms)  => padL + ((ms - tMin) / duration) * innerW;
-      const yPx = (bar) => padT + (1 - Math.max(0, bar) / yScale) * innerH;
+      // Path: filtra pontos dentro do range visivel + 1 vizinho de cada lado
+      // (mantem continuidade nas bordas e melhora performance pra zoom forte)
+      let firstIdx = 0, lastIdx = points.length - 1;
+      while (firstIdx < points.length - 1 && points[firstIdx + 1][0] < xMin) firstIdx++;
+      while (lastIdx > 0 && points[lastIdx - 1][0] > xMax) lastIdx--;
 
-      // Path da linha
       let d = '';
-      for (let i = 0; i < points.length; i++) {
+      for (let i = firstIdx; i <= lastIdx; i++) {
         const x = xPx(points[i][0]);
         const y = yPx(points[i][1]);
-        d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+        d += (i === firstIdx ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
       }
 
-      // Labels e grid
+      // Labels X
       const xLabels = [];
-      const gridV   = [];
+      const gridV = [];
       for (let i = 0; i <= 4; i++) {
-        const x = padL + (i * innerW) / 4;
-        const sec = (duration * i) / 4 / 1000;
-        xLabels.push('<text x="' + x + '" y="' + (H - 8) +
+        const x = CHART_PAD_L + (i * CHART_INNER_W) / 4;
+        const sec = (xMin + (duration * i) / 4 - tMin) / 1000;
+        xLabels.push('<text x="' + x + '" y="' + (CHART_H - 8) +
                      '" text-anchor="middle" class="cl">' + formatTime(sec) + '</text>');
         if (i > 0 && i < 4) {
-          gridV.push('<line x1="' + x + '" x2="' + x + '" y1="' + padT +
-                     '" y2="' + (H - padB) + '" class="cg"/>');
+          gridV.push('<line x1="' + x + '" x2="' + x + '" y1="' + CHART_PAD_T +
+                     '" y2="' + (CHART_H - CHART_PAD_B) + '" class="cg"/>');
         }
       }
 
+      // Labels Y
       const yLabels = [];
-      const gridH   = [];
+      const gridH = [];
       for (let i = 0; i <= 4; i++) {
-        const y = padT + (i * innerH) / 4;
+        const y = CHART_PAD_T + (i * CHART_INNER_H) / 4;
         const bar = yScale * (1 - i / 4);
-        yLabels.push('<text x="' + (padL - 4) + '" y="' + (y + 3) +
+        yLabels.push('<text x="' + (CHART_PAD_L - 4) + '" y="' + (y + 3) +
                      '" text-anchor="end" class="cl">' + bar.toFixed(2) + '</text>');
-        gridH.push('<line x1="' + padL + '" x2="' + (W - padR) +
+        gridH.push('<line x1="' + CHART_PAD_L + '" x2="' + (CHART_W - CHART_PAD_R) +
                    '" y1="' + y + '" y2="' + y + '" class="cg"/>');
       }
 
-      const xPeak = xPx(points[pMaxIdx][0]);
-      const yPeak = yPx(points[pMaxIdx][1]);
+      // Marcador de pico (so se estiver na janela visivel)
+      let peakMark = '';
+      const peakMs = points[pMaxIdx][0];
+      if (peakMs >= xMin && peakMs <= xMax) {
+        const xPeak = xPx(peakMs);
+        const yPeak = yPx(points[pMaxIdx][1]);
+        peakMark =
+          '<circle cx="' + xPeak + '" cy="' + yPeak + '" r="3" class="cdot"/>' +
+          '<text x="' + (xPeak + 5) + '" y="' + (yPeak - 5) +
+            '" class="cpklbl">' + pMax.toFixed(2) + ' bar</text>';
+      }
 
       const svg =
-        '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+        '<svg viewBox="0 0 ' + CHART_W + ' ' + CHART_H + '" preserveAspectRatio="none">' +
           '<style>' +
             '.cg{stroke:#1f2933;stroke-width:0.5}' +
             '.ca{stroke:#495057;stroke-width:1}' +
             '.cl{fill:#adb5bd;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
-            '.cline{stroke:#4dabf7;stroke-width:1.5;fill:none}' +
+            '.cline{stroke:#4dabf7;stroke-width:1.5;fill:none;stroke-linejoin:round}' +
             '.cdot{fill:#ff6b6b;stroke:#1a1a1a;stroke-width:1}' +
             '.cpklbl{fill:#ff6b6b;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
           '</style>' +
           gridH.join('') + gridV.join('') +
-          '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (H - padB) + '" class="ca"/>' +
-          '<line x1="' + padL + '" y1="' + (H - padB) + '" x2="' + (W - padR) + '" y2="' + (H - padB) + '" class="ca"/>' +
+          '<line x1="' + CHART_PAD_L + '" y1="' + CHART_PAD_T + '" x2="' + CHART_PAD_L +
+            '" y2="' + (CHART_H - CHART_PAD_B) + '" class="ca"/>' +
+          '<line x1="' + CHART_PAD_L + '" y1="' + (CHART_H - CHART_PAD_B) + '" x2="' +
+            (CHART_W - CHART_PAD_R) + '" y2="' + (CHART_H - CHART_PAD_B) + '" class="ca"/>' +
           xLabels.join('') + yLabels.join('') +
           '<path d="' + d + '" class="cline"/>' +
-          '<circle cx="' + xPeak + '" cy="' + yPeak + '" r="3" class="cdot"/>' +
-          '<text x="' + (xPeak + 5) + '" y="' + (yPeak - 5) +
-            '" class="cpklbl">' + pMax.toFixed(2) + ' bar</text>' +
+          peakMark +
         '</svg>';
 
       $('chartSvg').innerHTML = svg;
+
+      const fullRange = tMax - tMin;
+      const zoom = fullRange / duration;
+      const zoomLabel = zoom > 1.05 ? ' | zoom ' + zoom.toFixed(1) + 'x' : '';
       $('chartInfo').textContent =
         points.length + ' amostras | pico ' + pMax.toFixed(2) + ' bar | ' +
-        'duracao ' + formatTime(duration / 1000);
-      $('chartBox').hidden = false;
-      // Rola pra mostrar o grafico
-      setTimeout(() => $('chartBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+        'duracao ' + formatTime(fullRange / 1000) + zoomLabel;
     }
 
     function hideChart() {
       $('chartBox').hidden = true;
       $('chartSvg').innerHTML = '';
     }
+
+    function resetChartView() {
+      if (!chartData) return;
+      chartView = { xMin: chartData.tMin, xMax: chartData.tMax };
+      drawChart();
+    }
+
+    // === Touch handlers do grafico (pinch + pan + double-tap) ===
+    function clientXToDataX(clientX) {
+      if (!chartView) return 0;
+      const rect = $('chartSvg').getBoundingClientRect();
+      const fracOfSvg = (clientX - rect.left) / rect.width;
+      const viewBoxX = fracOfSvg * CHART_W;
+      const plotFrac = (viewBoxX - CHART_PAD_L) / CHART_INNER_W;
+      return chartView.xMin + plotFrac * (chartView.xMax - chartView.xMin);
+    }
+
+    function clipChartView(newMin, newMax) {
+      if (!chartData) return;
+      const fullMin = chartData.tMin, fullMax = chartData.tMax;
+      const range = newMax - newMin;
+      // limites: nao zooma alem dos dados, nao zooma demais
+      const fullRange = fullMax - fullMin;
+      const minRange = fullRange * 0.005;
+      if (range > fullRange) {
+        chartView.xMin = fullMin; chartView.xMax = fullMax; return;
+      }
+      if (range < minRange) {
+        const mid = (newMin + newMax) / 2;
+        newMin = mid - minRange / 2;
+        newMax = mid + minRange / 2;
+      }
+      // pan limit
+      if (newMin < fullMin) { newMax += (fullMin - newMin); newMin = fullMin; }
+      if (newMax > fullMax) { newMin -= (newMax - fullMax); newMax = fullMax; }
+      chartView.xMin = newMin; chartView.xMax = newMax;
+    }
+
+    function setupChartTouch() {
+      const el = $('chartSvg');
+      el.addEventListener('touchstart', (e) => {
+        if (!chartData) return;
+        if (e.touches.length === 1) {
+          chartTouch = {
+            mode: 'pan',
+            startX: e.touches[0].clientX,
+            startView: { xMin: chartView.xMin, xMax: chartView.xMax },
+            startTime: Date.now(),
+          };
+        } else if (e.touches.length >= 2) {
+          const t1 = e.touches[0], t2 = e.touches[1];
+          const span = Math.abs(t1.clientX - t2.clientX);
+          if (span < 5) return;
+          const midX = (t1.clientX + t2.clientX) / 2;
+          chartTouch = {
+            mode: 'pinch',
+            startSpan: span,
+            anchorDataX: clientXToDataX(midX),
+            startView: { xMin: chartView.xMin, xMax: chartView.xMax },
+          };
+        }
+      }, { passive: true });
+
+      el.addEventListener('touchmove', (e) => {
+        if (!chartTouch || !chartData) return;
+        e.preventDefault();
+        const rect = el.getBoundingClientRect();
+        if (chartTouch.mode === 'pan' && e.touches.length === 1) {
+          const deltaPx = e.touches[0].clientX - chartTouch.startX;
+          const range = chartTouch.startView.xMax - chartTouch.startView.xMin;
+          // converte deltaPx pra deltaData usando a razao plot/svg
+          const deltaData = -(deltaPx / rect.width) * (CHART_W / CHART_INNER_W) * range;
+          clipChartView(chartTouch.startView.xMin + deltaData,
+                        chartTouch.startView.xMax + deltaData);
+          scheduleRedraw();
+        } else if (chartTouch.mode === 'pinch' && e.touches.length >= 2) {
+          const t1 = e.touches[0], t2 = e.touches[1];
+          const span = Math.abs(t1.clientX - t2.clientX);
+          if (span < 5) return;
+          const midX = (t1.clientX + t2.clientX) / 2;
+          const factor = span / chartTouch.startSpan;
+          const startRange = chartTouch.startView.xMax - chartTouch.startView.xMin;
+          const newRange = startRange / factor;
+          // mantem o anchor data point sob o midpoint atual da pinca
+          const fracOfSvg = (midX - rect.left) / rect.width;
+          const viewBoxX = fracOfSvg * CHART_W;
+          const plotFrac = Math.max(0, Math.min(1, (viewBoxX - CHART_PAD_L) / CHART_INNER_W));
+          const newMin = chartTouch.anchorDataX - plotFrac * newRange;
+          clipChartView(newMin, newMin + newRange);
+          scheduleRedraw();
+        }
+      }, { passive: false });
+
+      el.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+          // double-tap detection: dois "tap" rapidos sem pan/pinch significativos
+          const now = Date.now();
+          const wasShortTap = chartTouch &&
+                              chartTouch.mode === 'pan' &&
+                              (now - chartTouch.startTime) < 250;
+          if (wasShortTap && (now - chartLastTapMs) < 300) {
+            resetChartView();
+            chartLastTapMs = 0;
+          } else if (wasShortTap) {
+            chartLastTapMs = now;
+          } else {
+            chartLastTapMs = 0;
+          }
+          chartTouch = null;
+        } else if (e.touches.length === 1 && chartTouch && chartTouch.mode === 'pinch') {
+          // saiu da pinca, continua com pan no dedo restante
+          chartTouch = {
+            mode: 'pan',
+            startX: e.touches[0].clientX,
+            startView: { xMin: chartView.xMin, xMax: chartView.xMax },
+            startTime: Date.now(),
+          };
+        }
+      }, { passive: true });
+    }
+    setupChartTouch();
 
     function startBleDownload() {
       if (!dataChar) { logLine('Stream nao disponivel', 'err'); return; }
