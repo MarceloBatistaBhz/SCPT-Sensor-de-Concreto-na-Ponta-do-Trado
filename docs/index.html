@@ -117,6 +117,47 @@
       width: 0%;
       transition: width 0.15s ease-out;
     }
+    .chart {
+      background: #2a2a2a;
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .chart-close {
+      background: transparent;
+      border: none;
+      color: #adb5bd;
+      font-size: 1.5rem;
+      cursor: pointer;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      line-height: 1;
+      padding: 0;
+    }
+    .chart-info {
+      font-size: 0.8rem;
+      color: #adb5bd;
+      margin-bottom: 0.6rem;
+      font-family: ui-monospace, "Consolas", monospace;
+    }
+    .chart-svg {
+      background: #0a0a0a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .chart-svg svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
     details {
       background: #2a2a2a;
       border-radius: 8px;
@@ -180,6 +221,15 @@
     </div>
   </div>
 
+  <div class="chart" id="chartBox" hidden>
+    <div class="chart-header">
+      <span>Grafico do log</span>
+      <button class="chart-close" id="btnCloseChart" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="chart-info" id="chartInfo"></div>
+    <div class="chart-svg" id="chartSvg"></div>
+  </div>
+
   <details>
     <summary>Avancado</summary>
 
@@ -201,7 +251,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v3 &middot; BLE file transfer &middot; Chrome/Edge no Android</p>
+  <p class="footer">v4 &middot; BLE file transfer + grafico &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -381,6 +431,10 @@
       const file = new File([blob], fname, { type: 'text/csv' });
 
       logLine('Transferencia completa (' + streamReceived + ' bytes).', 'ok');
+
+      // Renderiza grafico antes do share, pra que ja esteja na tela
+      // quando o usuario voltar do share sheet.
+      renderChart(total);
       resetStream();
 
       // Tenta share nativo (Android: WhatsApp aparece no share sheet)
@@ -400,6 +454,127 @@
         URL.revokeObjectURL(url);
         logLine('Compartilhamento nao disponivel — baixado direto.', 'ok');
       }
+    }
+
+    // === Grafico SVG do log.csv ===
+    function formatTime(seconds) {
+      if (seconds < 60) return Math.round(seconds) + 's';
+      const m = Math.floor(seconds / 60);
+      const s = Math.round(seconds % 60);
+      return m + 'm' + String(s).padStart(2, '0') + 's';
+    }
+
+    function renderChart(bytes) {
+      // Parse do CSV (formato: "ms;bar\n" + linhas "tempo_ms;valor_bar")
+      const text = new TextDecoder().decode(bytes);
+      const lines = text.split('\n');
+      const points = [];
+      for (let i = 1; i < lines.length; i++) {  // pula header
+        const line = lines[i].trim();
+        if (!line) continue;
+        const parts = line.split(';');
+        if (parts.length !== 2) continue;
+        const ms = parseInt(parts[0], 10);
+        const bar = parseFloat(parts[1]);
+        if (!isFinite(ms) || !isFinite(bar)) continue;
+        points.push([ms, bar]);
+      }
+
+      if (points.length < 2) {
+        $('chartBox').hidden = true;
+        logLine('Grafico: dados insuficientes (' + points.length + ' amostras)', 'err');
+        return;
+      }
+
+      const tMin = points[0][0];
+      const tMax = points[points.length - 1][0];
+      const duration = Math.max(1, tMax - tMin);
+
+      let pMax = -Infinity;
+      let pMaxIdx = 0;
+      for (let i = 0; i < points.length; i++) {
+        if (points[i][1] > pMax) { pMax = points[i][1]; pMaxIdx = i; }
+      }
+      // Se pMax <= 0, usa 1.0 como escala minima pra nao dividir por zero
+      const yScale = Math.max(pMax, 0.1);
+
+      // Geometria do SVG
+      const W = 360, H = 220;
+      const padL = 40, padR = 12, padT = 10, padB = 28;
+      const innerW = W - padL - padR;
+      const innerH = H - padT - padB;
+
+      const xPx = (ms)  => padL + ((ms - tMin) / duration) * innerW;
+      const yPx = (bar) => padT + (1 - Math.max(0, bar) / yScale) * innerH;
+
+      // Path da linha
+      let d = '';
+      for (let i = 0; i < points.length; i++) {
+        const x = xPx(points[i][0]);
+        const y = yPx(points[i][1]);
+        d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+      }
+
+      // Labels e grid
+      const xLabels = [];
+      const gridV   = [];
+      for (let i = 0; i <= 4; i++) {
+        const x = padL + (i * innerW) / 4;
+        const sec = (duration * i) / 4 / 1000;
+        xLabels.push('<text x="' + x + '" y="' + (H - 8) +
+                     '" text-anchor="middle" class="cl">' + formatTime(sec) + '</text>');
+        if (i > 0 && i < 4) {
+          gridV.push('<line x1="' + x + '" x2="' + x + '" y1="' + padT +
+                     '" y2="' + (H - padB) + '" class="cg"/>');
+        }
+      }
+
+      const yLabels = [];
+      const gridH   = [];
+      for (let i = 0; i <= 4; i++) {
+        const y = padT + (i * innerH) / 4;
+        const bar = yScale * (1 - i / 4);
+        yLabels.push('<text x="' + (padL - 4) + '" y="' + (y + 3) +
+                     '" text-anchor="end" class="cl">' + bar.toFixed(2) + '</text>');
+        gridH.push('<line x1="' + padL + '" x2="' + (W - padR) +
+                   '" y1="' + y + '" y2="' + y + '" class="cg"/>');
+      }
+
+      const xPeak = xPx(points[pMaxIdx][0]);
+      const yPeak = yPx(points[pMaxIdx][1]);
+
+      const svg =
+        '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+          '<style>' +
+            '.cg{stroke:#1f2933;stroke-width:0.5}' +
+            '.ca{stroke:#495057;stroke-width:1}' +
+            '.cl{fill:#adb5bd;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
+            '.cline{stroke:#4dabf7;stroke-width:1.5;fill:none}' +
+            '.cdot{fill:#ff6b6b;stroke:#1a1a1a;stroke-width:1}' +
+            '.cpklbl{fill:#ff6b6b;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
+          '</style>' +
+          gridH.join('') + gridV.join('') +
+          '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (H - padB) + '" class="ca"/>' +
+          '<line x1="' + padL + '" y1="' + (H - padB) + '" x2="' + (W - padR) + '" y2="' + (H - padB) + '" class="ca"/>' +
+          xLabels.join('') + yLabels.join('') +
+          '<path d="' + d + '" class="cline"/>' +
+          '<circle cx="' + xPeak + '" cy="' + yPeak + '" r="3" class="cdot"/>' +
+          '<text x="' + (xPeak + 5) + '" y="' + (yPeak - 5) +
+            '" class="cpklbl">' + pMax.toFixed(2) + ' bar</text>' +
+        '</svg>';
+
+      $('chartSvg').innerHTML = svg;
+      $('chartInfo').textContent =
+        points.length + ' amostras | pico ' + pMax.toFixed(2) + ' bar | ' +
+        'duracao ' + formatTime(duration / 1000);
+      $('chartBox').hidden = false;
+      // Rola pra mostrar o grafico
+      setTimeout(() => $('chartBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+    }
+
+    function hideChart() {
+      $('chartBox').hidden = true;
+      $('chartSvg').innerHTML = '';
     }
 
     function startBleDownload() {
@@ -511,6 +686,7 @@
     $('btnStart').onclick       = () => sendCmd('START');
     $('btnStop').onclick        = () => sendCmd('STOP');
     $('btnDownloadBle').onclick = startBleDownload;
+    $('btnCloseChart').onclick  = hideChart;
     $('btnDownload').onclick    = () => sendCmd('DOWNLOAD');
     $('btnStopWifi').onclick    = () => sendCmd('STOPWIFI');
     $('btnErase').onclick     = () => {
