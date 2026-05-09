@@ -262,7 +262,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v7 &middot; pinch via Pointer Events + setPointerCapture &middot; Chrome/Edge no Android</p>
+  <p class="footer">v7.1 &middot; grafico com pinch + pan + reset &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -708,12 +708,7 @@
             startSpan: span,
             anchorDataX: clientXToDataX(midX),
             startView: { xMin: chartView.xMin, xMax: chartView.xMax },
-            moveCount: 0,
           };
-          $('chartHint').textContent =
-            'pinch START span=' + span.toFixed(0) +
-            ' f1=' + Math.round(arr[0].x) + ',' + Math.round(arr[0].y) +
-            ' f2=' + Math.round(arr[1].x) + ',' + Math.round(arr[1].y);
         }
       });
 
@@ -731,7 +726,6 @@
                         chartTouch.startView.xMax + deltaData);
           scheduleRedraw();
         } else if (chartTouch.mode === 'pinch' && ptrs.size >= 2) {
-          chartTouch.moveCount = (chartTouch.moveCount || 0) + 1;
           const arr = ptrArray();
           const span = Math.hypot(arr[0].x - arr[1].x, arr[0].y - arr[1].y);
           if (span < 10) return;
@@ -745,11 +739,6 @@
           const newMin = chartTouch.anchorDataX - plotFrac * newRange;
           clipChartView(newMin, newMin + newRange);
           scheduleRedraw();
-          $('chartHint').textContent =
-            'moves=' + chartTouch.moveCount +
-            ' f1=' + Math.round(arr[0].x) + ',' + Math.round(arr[0].y) +
-            ' f2=' + Math.round(arr[1].x) + ',' + Math.round(arr[1].y) +
-            ' span=' + span.toFixed(0) + ' factor=' + factor.toFixed(2);
         }
       });
 
@@ -772,7 +761,6 @@
             chartLastTapMs = 0;
           }
           chartTouch = null;
-          $('chartHint').textContent = 'pinca pra zoom · arrasta pra mover · toque duplo pra resetar';
         }
         // Se ainda sobrou 1 dedo, mantemos o estado atual de pinch
         // (nao troca pra pan no meio do gesto).
