@@ -152,7 +152,7 @@
       background: #0a0a0a;
       border-radius: 6px;
       overflow: hidden;
-      touch-action: none;            /* deixa nossos handlers controlarem zoom/pan */
+      touch-action: none;
       -webkit-user-select: none;
       user-select: none;
     }
@@ -160,6 +160,7 @@
       width: 100%;
       height: auto;
       display: block;
+      touch-action: none;            /* tambem na svg pra Chrome Android nao interceptar */
     }
     .chart-hint {
       font-size: 0.7rem;
@@ -261,7 +262,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v6.2 &middot; pinch debug com contador + posicoes &middot; Chrome/Edge no Android</p>
+  <p class="footer">v7 &middot; pinch via Pointer Events + setPointerCapture &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -672,58 +673,69 @@
       chartView.xMin = newMin; chartView.xMax = newMax;
     }
 
+    // Usa Pointer Events em vez de Touch Events. Pointer Events com
+    // setPointerCapture garante que o browser nao "rouba" o gesto pra
+    // pinch-to-zoom da pagina (problema observado no Chrome do S25,
+    // onde os touchmove paravam de disparar apos o primeiro frame).
     function setupChartTouch() {
       const el = $('chartSvg');
-      el.addEventListener('touchstart', (e) => {
+      const ptrs = new Map();   // pointerId -> { x, y }
+
+      function ptrArray() { return [...ptrs.values()]; }
+
+      el.addEventListener('pointerdown', (e) => {
         if (!chartData) return;
-        if (e.touches.length === 1) {
-          // So entra em pan se nao estiver em pinch (evita reset durante pinca)
+        if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+        try { el.setPointerCapture(e.pointerId); } catch (_) {}
+        ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (ptrs.size === 1) {
           if (!chartTouch || chartTouch.mode !== 'pinch') {
             chartTouch = {
               mode: 'pan',
-              startX: e.touches[0].clientX,
+              startX: e.clientX,
               startView: { xMin: chartView.xMin, xMax: chartView.xMax },
               startTime: Date.now(),
             };
           }
-        } else if (e.touches.length >= 2) {
-          const t1 = e.touches[0], t2 = e.touches[1];
-          const span = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        } else if (ptrs.size === 2) {
+          const arr = ptrArray();
+          const span = Math.hypot(arr[0].x - arr[1].x, arr[0].y - arr[1].y);
           if (span < 10) return;
-          const midX = (t1.clientX + t2.clientX) / 2;
+          const midX = (arr[0].x + arr[1].x) / 2;
           chartTouch = {
             mode: 'pinch',
             startSpan: span,
             anchorDataX: clientXToDataX(midX),
             startView: { xMin: chartView.xMin, xMax: chartView.xMax },
             moveCount: 0,
-            startF1: { x: Math.round(t1.clientX), y: Math.round(t1.clientY) },
-            startF2: { x: Math.round(t2.clientX), y: Math.round(t2.clientY) },
           };
           $('chartHint').textContent =
             'pinch START span=' + span.toFixed(0) +
-            ' f1=' + chartTouch.startF1.x + ',' + chartTouch.startF1.y +
-            ' f2=' + chartTouch.startF2.x + ',' + chartTouch.startF2.y;
+            ' f1=' + Math.round(arr[0].x) + ',' + Math.round(arr[0].y) +
+            ' f2=' + Math.round(arr[1].x) + ',' + Math.round(arr[1].y);
         }
-      }, { passive: true });
+      });
 
-      el.addEventListener('touchmove', (e) => {
-        if (!chartTouch || !chartData) return;
-        e.preventDefault();
+      el.addEventListener('pointermove', (e) => {
+        if (!chartData || !ptrs.has(e.pointerId)) return;
+        ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (!chartTouch) return;
+
         const rect = el.getBoundingClientRect();
-        if (chartTouch.mode === 'pan' && e.touches.length === 1) {
-          const deltaPx = e.touches[0].clientX - chartTouch.startX;
+        if (chartTouch.mode === 'pan' && ptrs.size === 1) {
+          const deltaPx = e.clientX - chartTouch.startX;
           const range = chartTouch.startView.xMax - chartTouch.startView.xMin;
           const deltaData = -(deltaPx / rect.width) * (CHART_W / CHART_INNER_W) * range;
           clipChartView(chartTouch.startView.xMin + deltaData,
                         chartTouch.startView.xMax + deltaData);
           scheduleRedraw();
-        } else if (chartTouch.mode === 'pinch' && e.touches.length >= 2) {
+        } else if (chartTouch.mode === 'pinch' && ptrs.size >= 2) {
           chartTouch.moveCount = (chartTouch.moveCount || 0) + 1;
-          const t1 = e.touches[0], t2 = e.touches[1];
-          const span = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+          const arr = ptrArray();
+          const span = Math.hypot(arr[0].x - arr[1].x, arr[0].y - arr[1].y);
           if (span < 10) return;
-          const midX = (t1.clientX + t2.clientX) / 2;
+          const midX = (arr[0].x + arr[1].x) / 2;
           const factor = span / chartTouch.startSpan;
           const startRange = chartTouch.startView.xMax - chartTouch.startView.xMin;
           const newRange = startRange / factor;
@@ -733,17 +745,20 @@
           const newMin = chartTouch.anchorDataX - plotFrac * newRange;
           clipChartView(newMin, newMin + newRange);
           scheduleRedraw();
-          // DEBUG: contagem + posicoes absolutas dos dois dedos
           $('chartHint').textContent =
             'moves=' + chartTouch.moveCount +
-            ' f1=' + Math.round(t1.clientX) + ',' + Math.round(t1.clientY) +
-            ' f2=' + Math.round(t2.clientX) + ',' + Math.round(t2.clientY) +
+            ' f1=' + Math.round(arr[0].x) + ',' + Math.round(arr[0].y) +
+            ' f2=' + Math.round(arr[1].x) + ',' + Math.round(arr[1].y) +
             ' span=' + span.toFixed(0) + ' factor=' + factor.toFixed(2);
         }
-      }, { passive: false });
+      });
 
-      el.addEventListener('touchend', (e) => {
-        if (e.touches.length === 0) {
+      function endPointer(e) {
+        ptrs.delete(e.pointerId);
+        try { el.releasePointerCapture(e.pointerId); } catch (_) {}
+
+        if (ptrs.size === 0) {
+          // ultimo dedo saiu — finaliza gesto
           const now = Date.now();
           const wasShortTap = chartTouch &&
                               chartTouch.mode === 'pan' &&
@@ -759,9 +774,18 @@
           chartTouch = null;
           $('chartHint').textContent = 'pinca pra zoom · arrasta pra mover · toque duplo pra resetar';
         }
-        // Se ainda tem 1 dedo no chao apos pinca, NAO troca pra pan automaticamente
-        // (a troca estava resetando startSpan no proximo touchstart, limitando o zoom).
-      }, { passive: true });
+        // Se ainda sobrou 1 dedo, mantemos o estado atual de pinch
+        // (nao troca pra pan no meio do gesto).
+      }
+
+      el.addEventListener('pointerup', endPointer);
+      el.addEventListener('pointercancel', endPointer);
+      el.addEventListener('pointerleave', (e) => {
+        // S6 que esse pointer estava capturado por nos
+        if (ptrs.has(e.pointerId) && !el.hasPointerCapture(e.pointerId)) {
+          endPointer(e);
+        }
+      });
     }
     setupChartTouch();
 
