@@ -261,7 +261,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v6.1 &middot; pinch debug + protege startSpan &middot; Chrome/Edge no Android</p>
+  <p class="footer">v6.2 &middot; pinch debug com contador + posicoes &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -696,9 +696,14 @@
             startSpan: span,
             anchorDataX: clientXToDataX(midX),
             startView: { xMin: chartView.xMin, xMax: chartView.xMax },
+            moveCount: 0,
+            startF1: { x: Math.round(t1.clientX), y: Math.round(t1.clientY) },
+            startF2: { x: Math.round(t2.clientX), y: Math.round(t2.clientY) },
           };
           $('chartHint').textContent =
-            'pinch START span=' + span.toFixed(0) + ' touches=' + e.touches.length;
+            'pinch START span=' + span.toFixed(0) +
+            ' f1=' + chartTouch.startF1.x + ',' + chartTouch.startF1.y +
+            ' f2=' + chartTouch.startF2.x + ',' + chartTouch.startF2.y;
         }
       }, { passive: true });
 
@@ -714,6 +719,7 @@
                         chartTouch.startView.xMax + deltaData);
           scheduleRedraw();
         } else if (chartTouch.mode === 'pinch' && e.touches.length >= 2) {
+          chartTouch.moveCount = (chartTouch.moveCount || 0) + 1;
           const t1 = e.touches[0], t2 = e.touches[1];
           const span = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
           if (span < 10) return;
@@ -727,12 +733,12 @@
           const newMin = chartTouch.anchorDataX - plotFrac * newRange;
           clipChartView(newMin, newMin + newRange);
           scheduleRedraw();
-          // DEBUG: mostra valores em tempo real
+          // DEBUG: contagem + posicoes absolutas dos dois dedos
           $('chartHint').textContent =
-            'start=' + chartTouch.startSpan.toFixed(0) +
-            ' now=' + span.toFixed(0) +
-            ' factor=' + factor.toFixed(2) + 'x' +
-            ' touches=' + e.touches.length;
+            'moves=' + chartTouch.moveCount +
+            ' f1=' + Math.round(t1.clientX) + ',' + Math.round(t1.clientY) +
+            ' f2=' + Math.round(t2.clientX) + ',' + Math.round(t2.clientY) +
+            ' span=' + span.toFixed(0) + ' factor=' + factor.toFixed(2);
         }
       }, { passive: false });
 
