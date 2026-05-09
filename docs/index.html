@@ -237,7 +237,7 @@
     </div>
     <div class="chart-info" id="chartInfo"></div>
     <div class="chart-svg" id="chartSvg"></div>
-    <div class="chart-hint">pinca pra zoom &middot; arrasta pra mover &middot; toque duplo pra resetar</div>
+    <div class="chart-hint" id="chartHint">pinca pra zoom &middot; arrasta pra mover &middot; toque duplo pra resetar</div>
   </div>
 
   <details>
@@ -261,7 +261,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v6 &middot; pinch fix + SW bypassa HTTP cache &middot; Chrome/Edge no Android</p>
+  <p class="footer">v6.1 &middot; pinch debug + protege startSpan &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -677,15 +677,17 @@
       el.addEventListener('touchstart', (e) => {
         if (!chartData) return;
         if (e.touches.length === 1) {
-          chartTouch = {
-            mode: 'pan',
-            startX: e.touches[0].clientX,
-            startView: { xMin: chartView.xMin, xMax: chartView.xMax },
-            startTime: Date.now(),
-          };
+          // So entra em pan se nao estiver em pinch (evita reset durante pinca)
+          if (!chartTouch || chartTouch.mode !== 'pinch') {
+            chartTouch = {
+              mode: 'pan',
+              startX: e.touches[0].clientX,
+              startView: { xMin: chartView.xMin, xMax: chartView.xMax },
+              startTime: Date.now(),
+            };
+          }
         } else if (e.touches.length >= 2) {
           const t1 = e.touches[0], t2 = e.touches[1];
-          // Distancia euclidiana — funciona com pinca em qualquer direcao
           const span = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
           if (span < 10) return;
           const midX = (t1.clientX + t2.clientX) / 2;
@@ -695,6 +697,8 @@
             anchorDataX: clientXToDataX(midX),
             startView: { xMin: chartView.xMin, xMax: chartView.xMax },
           };
+          $('chartHint').textContent =
+            'pinch START span=' + span.toFixed(0) + ' touches=' + e.touches.length;
         }
       }, { passive: true });
 
@@ -705,7 +709,6 @@
         if (chartTouch.mode === 'pan' && e.touches.length === 1) {
           const deltaPx = e.touches[0].clientX - chartTouch.startX;
           const range = chartTouch.startView.xMax - chartTouch.startView.xMin;
-          // converte deltaPx pra deltaData usando a razao plot/svg
           const deltaData = -(deltaPx / rect.width) * (CHART_W / CHART_INNER_W) * range;
           clipChartView(chartTouch.startView.xMin + deltaData,
                         chartTouch.startView.xMax + deltaData);
@@ -718,19 +721,23 @@
           const factor = span / chartTouch.startSpan;
           const startRange = chartTouch.startView.xMax - chartTouch.startView.xMin;
           const newRange = startRange / factor;
-          // mantem o anchor data point sob o midpoint atual da pinca
           const fracOfSvg = (midX - rect.left) / rect.width;
           const viewBoxX = fracOfSvg * CHART_W;
           const plotFrac = Math.max(0, Math.min(1, (viewBoxX - CHART_PAD_L) / CHART_INNER_W));
           const newMin = chartTouch.anchorDataX - plotFrac * newRange;
           clipChartView(newMin, newMin + newRange);
           scheduleRedraw();
+          // DEBUG: mostra valores em tempo real
+          $('chartHint').textContent =
+            'start=' + chartTouch.startSpan.toFixed(0) +
+            ' now=' + span.toFixed(0) +
+            ' factor=' + factor.toFixed(2) + 'x' +
+            ' touches=' + e.touches.length;
         }
       }, { passive: false });
 
       el.addEventListener('touchend', (e) => {
         if (e.touches.length === 0) {
-          // double-tap detection: dois "tap" rapidos sem pan/pinch significativos
           const now = Date.now();
           const wasShortTap = chartTouch &&
                               chartTouch.mode === 'pan' &&
@@ -744,15 +751,10 @@
             chartLastTapMs = 0;
           }
           chartTouch = null;
-        } else if (e.touches.length === 1 && chartTouch && chartTouch.mode === 'pinch') {
-          // saiu da pinca, continua com pan no dedo restante
-          chartTouch = {
-            mode: 'pan',
-            startX: e.touches[0].clientX,
-            startView: { xMin: chartView.xMin, xMax: chartView.xMax },
-            startTime: Date.now(),
-          };
+          $('chartHint').textContent = 'pinca pra zoom · arrasta pra mover · toque duplo pra resetar';
         }
+        // Se ainda tem 1 dedo no chao apos pinca, NAO troca pra pan automaticamente
+        // (a troca estava resetando startSpan no proximo touchstart, limitando o zoom).
       }, { passive: true });
     }
     setupChartTouch();
