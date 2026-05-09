@@ -261,7 +261,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v5 &middot; grafico com zoom interativo &middot; Chrome/Edge no Android</p>
+  <p class="footer">v5.1 &middot; pinch fix (distancia euclidiana) &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -685,8 +685,9 @@
           };
         } else if (e.touches.length >= 2) {
           const t1 = e.touches[0], t2 = e.touches[1];
-          const span = Math.abs(t1.clientX - t2.clientX);
-          if (span < 5) return;
+          // Distancia euclidiana — funciona com pinca em qualquer direcao
+          const span = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+          if (span < 10) return;
           const midX = (t1.clientX + t2.clientX) / 2;
           chartTouch = {
             mode: 'pinch',
@@ -711,8 +712,8 @@
           scheduleRedraw();
         } else if (chartTouch.mode === 'pinch' && e.touches.length >= 2) {
           const t1 = e.touches[0], t2 = e.touches[1];
-          const span = Math.abs(t1.clientX - t2.clientX);
-          if (span < 5) return;
+          const span = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+          if (span < 10) return;
           const midX = (t1.clientX + t2.clientX) / 2;
           const factor = span / chartTouch.startSpan;
           const startRange = chartTouch.startView.xMax - chartTouch.startView.xMin;
