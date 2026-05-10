@@ -20,3 +20,6 @@ desktop.ini
 
 # Notas pessoais (prompts, rascunhos)
 prompts SCPT.txt
+
+# Firmware nao distribuido publicamente
+MedidorSinalBLE.ino
