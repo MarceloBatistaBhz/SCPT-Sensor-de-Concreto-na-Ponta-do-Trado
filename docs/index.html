@@ -317,7 +317,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v11 &middot; indicador de bateria &middot; Chrome/Edge no Android</p>
+  <p class="footer">v11.1 &middot; nome do CSV em hora local &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -605,7 +605,13 @@
       let off = 0;
       for (const c of streamChunks) { total.set(c, off); off += c.length; }
       const blob = new Blob([total], { type: 'text/csv' });
-      const fname = 'log_' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.csv';
+      // Timestamp em horario local do celular (nao UTC) pra ficar intuitivo
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const fname = 'log_' +
+        d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+        '_' + pad(d.getHours()) + '-' + pad(d.getMinutes()) + '-' + pad(d.getSeconds()) +
+        '.csv';
       const file = new File([blob], fname, { type: 'text/csv' });
 
       logLine('Transferencia completa (' + streamReceived + ' bytes).', 'ok');
