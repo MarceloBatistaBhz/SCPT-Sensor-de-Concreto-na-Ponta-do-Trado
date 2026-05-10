@@ -86,6 +86,26 @@
       font-family: ui-monospace, "Consolas", monospace;
       letter-spacing: 0.5px;
     }
+    .status-live {
+      font-size: 0.95rem;
+      color: #f0f0f0;
+      margin-top: 0.4rem;
+      font-family: ui-monospace, "Consolas", monospace;
+      letter-spacing: 0.3px;
+      font-weight: 600;
+    }
+    .status-live .lv-p { color: #4dabf7; }
+    .status-live .lv-t { color: #dee2e6; }
+    .status-sparkline {
+      margin-top: 0.6rem;
+      border-top: 1px solid #1f2933;
+      padding-top: 0.5rem;
+    }
+    .status-sparkline svg {
+      width: 100%;
+      height: 60px;
+      display: block;
+    }
     .status-started {
       font-size: 0.78rem;
       color: #adb5bd;
@@ -192,6 +212,7 @@
     }
     .lg-blue   { background: #4dabf7; }
     .lg-orange { background: #ffa94d; }
+    .lg-gray   { background: #dee2e6; }
     .chart-svg {
       background: #0a0a0a;
       border-radius: 6px;
@@ -312,8 +333,10 @@
       </span>
     </div>
     <div class="status-value" id="statusValue">Desconectado</div>
+    <div class="status-live" id="statusLive" hidden></div>
     <div class="status-started" id="statusStarted" hidden></div>
     <div class="status-countdown" id="statusCountdown" hidden></div>
+    <div class="status-sparkline" id="statusSparkline" hidden></div>
   </div>
 
   <button class="btn btn-primary" id="btnConnect">Conectar via Bluetooth</button>
@@ -366,7 +389,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v12.1 &middot; fix: modal nao abre sozinho &middot; Chrome/Edge no Android</p>
+  <p class="footer">v13 &middot; temperatura + sparkline + valores ao vivo &middot; Chrome/Edge no Android</p>
 
   <div class="modal-overlay" id="tareModal" hidden>
     <div class="modal-card">
@@ -410,7 +433,7 @@
     const CHART_W      = 360;
     const CHART_H      = 220;
     const CHART_PAD_L  = 40;
-    const CHART_PAD_R  = 12;
+    const CHART_PAD_R  = 38;     // espaco pro eixo Y secundario (temperatura)
     const CHART_PAD_T  = 10;
     const CHART_PAD_B  = 28;
     const CHART_INNER_W = CHART_W - CHART_PAD_L - CHART_PAD_R;
@@ -429,6 +452,12 @@
     let countdownAnchor = null;  // { remainingS, anchorMs }
     let countdownTimer  = null;  // setInterval id
     let sessionStartedAt = null; // Date — hora local de inicio da coleta
+
+    // Sparkline ao vivo (ultimos 60 s)
+    const SPARK_WINDOW_MS = 60000;
+    const SPARK_MA_WINDOW = 10;     // janela menor pra MA ao vivo (responsiva)
+    let liveSamples = [];           // [{ t, bar, temp }]
+    let lastSeenState = '';
 
     function logLine(msg, cls) {
       const el = document.createElement('div');
@@ -495,17 +524,118 @@
       $('statusCountdown').textContent = '';
     }
 
+    // === Sparkline ao vivo ===
+    function pushLiveSample(bar, temp) {
+      const now = Date.now();
+      liveSamples.push({ t: now, bar: bar, temp: temp });
+      const cutoff = now - SPARK_WINDOW_MS;
+      while (liveSamples.length > 0 && liveSamples[0].t < cutoff) {
+        liveSamples.shift();
+      }
+      drawSparkline();
+    }
+    function clearLiveSamples() {
+      liveSamples = [];
+      $('statusSparkline').hidden = true;
+      $('statusSparkline').innerHTML = '';
+    }
+    function drawSparkline() {
+      if (liveSamples.length < 2) {
+        $('statusSparkline').hidden = true;
+        return;
+      }
+      $('statusSparkline').hidden = false;
+
+      const W = 100, H = 30;
+      const now = Date.now();
+      const tFrom = now - SPARK_WINDOW_MS;
+
+      // Computa MA local (janela 10) sobre liveSamples
+      const ma = new Array(liveSamples.length);
+      let sum = 0;
+      for (let i = 0; i < liveSamples.length; i++) {
+        sum += liveSamples[i].bar;
+        if (i >= SPARK_MA_WINDOW) sum -= liveSamples[i - SPARK_MA_WINDOW].bar;
+        ma[i] = sum / Math.min(i + 1, SPARK_MA_WINDOW);
+      }
+
+      // Escalas independentes: pressao+MA compartilham, temp tem propria
+      let pMin = Infinity, pMax = -Infinity;
+      let tMinV = Infinity, tMaxV = -Infinity;
+      for (let i = 0; i < liveSamples.length; i++) {
+        const s = liveSamples[i];
+        if (s.bar < pMin) pMin = s.bar;
+        if (s.bar > pMax) pMax = s.bar;
+        if (ma[i] < pMin) pMin = ma[i];
+        if (ma[i] > pMax) pMax = ma[i];
+        if (isFinite(s.temp)) {
+          if (s.temp < tMinV) tMinV = s.temp;
+          if (s.temp > tMaxV) tMaxV = s.temp;
+        }
+      }
+      if (pMax - pMin < 0.05) { pMax = pMin + 0.5; }
+      if (tMaxV - tMinV < 0.2) { tMaxV = tMinV + 1; }
+
+      const xPx = (t) => ((t - tFrom) / SPARK_WINDOW_MS) * W;
+      const yP  = (v) => H - ((v - pMin) / (pMax - pMin)) * H;
+      const yT  = (v) => H - ((v - tMinV) / (tMaxV - tMinV)) * H;
+
+      let dP = '', dM = '', dT = '';
+      for (let i = 0; i < liveSamples.length; i++) {
+        const s = liveSamples[i];
+        const x = xPx(s.t).toFixed(1);
+        dP += (i === 0 ? 'M' : 'L') + x + ',' + yP(s.bar).toFixed(1) + ' ';
+        dM += (i === 0 ? 'M' : 'L') + x + ',' + yP(ma[i]).toFixed(1) + ' ';
+        if (isFinite(s.temp)) {
+          dT += (i === 0 ? 'M' : 'L') + x + ',' + yT(s.temp).toFixed(1) + ' ';
+        }
+      }
+
+      $('statusSparkline').innerHTML =
+        '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+          '<path d="' + dT + '" stroke="#dee2e6" stroke-width="0.5" fill="none" opacity="0.7"/>' +
+          '<path d="' + dM + '" stroke="#ffa94d" stroke-width="0.5" fill="none" opacity="0.85"/>' +
+          '<path d="' + dP + '" stroke="#4dabf7" stroke-width="0.7" fill="none"/>' +
+        '</svg>';
+    }
+
     function applyState(text) {
-      // Extrai r=NNN (segundos restantes) e b=NNNN (bateria mV) e remove
-      // ambos do texto exibido pra deixar limpo (ex.: "COLL 1Hz n=42")
+      // Extrai campos opcionais e os remove do texto exibido
       const matchR = text.match(/\s*r=(\d+)/);
       const matchB = text.match(/\s*b=(\d+)/);
+      const matchP = text.match(/\s*p=(-?\d+\.\d+)/);
+      const matchT = text.match(/\s*t=(-?\d+\.\d+)/);
       const remainingS = matchR ? parseInt(matchR[1], 10) : null;
       const batteryMv  = matchB ? parseInt(matchB[1], 10) : null;
-      const visibleText = text.replace(/\s*r=\d+/, '').replace(/\s*b=\d+/, '');
+      const livePres   = matchP ? parseFloat(matchP[1])    : null;
+      const liveTemp   = matchT ? parseFloat(matchT[1])    : null;
+      const visibleText = text
+        .replace(/\s*r=\d+/, '')
+        .replace(/\s*b=\d+/, '')
+        .replace(/\s*p=-?\d+\.\d+/, '')
+        .replace(/\s*t=-?\d+\.\d+/, '');
 
       $('statusValue').textContent = visibleText;
       updateBattery(batteryMv);
+
+      // Detecta entrada em COLL pra resetar sparkline
+      const wasColl = lastSeenState.startsWith('COLL');
+      const isColl  = visibleText.startsWith('COLL');
+      if (isColl && !wasColl) clearLiveSamples();
+      if (!isColl && wasColl) clearLiveSamples();
+      lastSeenState = visibleText;
+
+      // Live values + sparkline durante COLL
+      if (isColl && livePres !== null && liveTemp !== null) {
+        $('statusLive').hidden = false;
+        $('statusLive').innerHTML =
+          '<span class="lv-p">' + livePres.toFixed(1) + ' bar</span>' +
+          ' &middot; ' +
+          '<span class="lv-t">' + liveTemp.toFixed(1) + ' &deg;C</span>';
+        pushLiveSample(livePres, liveTemp);
+      } else {
+        $('statusLive').hidden = true;
+      }
 
       // Countdown so durante COLL com r= valido
       if (remainingS !== null && visibleText.startsWith('COLL')) {
@@ -725,29 +855,54 @@
     function parseCsvBytes(bytes) {
       const text = new TextDecoder().decode(bytes);
       const lines = text.split('\n');
-      const points = [];
+      const points = [];   // [ms, bar, degC] — degC pode ser NaN se CSV antigo
+      let hasTemp = false;
       for (let i = 1; i < lines.length; i++) {  // pula header
         const line = lines[i].trim();
         if (!line) continue;
         const parts = line.split(';');
-        if (parts.length !== 2) continue;
-        const ms = parseInt(parts[0], 10);
+        if (parts.length < 2) continue;
+        const ms  = parseInt(parts[0], 10);
         const bar = parseFloat(parts[1]);
         if (!isFinite(ms) || !isFinite(bar)) continue;
-        points.push([ms, bar]);
+        const degC = (parts.length >= 3) ? parseFloat(parts[2]) : NaN;
+        if (isFinite(degC)) hasTemp = true;
+        points.push([ms, bar, degC]);
       }
       if (points.length < 2) return null;
+
       let pMax = -Infinity, pMaxIdx = 0;
       for (let i = 0; i < points.length; i++) {
         if (points[i][1] > pMax) { pMax = points[i][1]; pMaxIdx = i; }
       }
+
+      // Eixo de temperatura: centrado em T_init, minimo +/- 5 °C
+      let tInit = NaN, tAxisMin = NaN, tAxisMax = NaN;
+      if (hasTemp) {
+        // Acha primeiro temp valido pra ser T_init
+        for (const p of points) { if (isFinite(p[2])) { tInit = p[2]; break; } }
+        let tMinV = Infinity, tMaxV = -Infinity;
+        for (const p of points) {
+          if (isFinite(p[2])) {
+            if (p[2] < tMinV) tMinV = p[2];
+            if (p[2] > tMaxV) tMaxV = p[2];
+          }
+        }
+        tAxisMin = Math.min(tInit - 5, tMinV - 0.5);
+        tAxisMax = Math.max(tInit + 5, tMaxV + 0.5);
+      }
+
       return {
         points,
         ma: computeMA(points, MA_WINDOW),
         pMax,
         pMaxIdx,
         tMin: points[0][0],
-        tMax: points[points.length - 1][0]
+        tMax: points[points.length - 1][0],
+        hasTemp,
+        tInit,
+        tAxisMin,
+        tAxisMax,
       };
     }
 
@@ -773,28 +928,37 @@
 
     function drawChart() {
       if (!chartData || !chartView) return;
-      const { points, ma, pMax, pMaxIdx, tMin, tMax } = chartData;
+      const { points, ma, pMax, pMaxIdx, tMin, tMax,
+              hasTemp, tAxisMin, tAxisMax } = chartData;
       const { xMin, xMax } = chartView;
       const duration = Math.max(1, xMax - xMin);
       const yScale = Math.max(pMax, 0.1);
 
-      const xPx = (ms)  => CHART_PAD_L + ((ms - xMin) / duration) * CHART_INNER_W;
-      const yPx = (bar) => CHART_PAD_T + (1 - Math.max(0, bar) / yScale) * CHART_INNER_H;
+      const xPx  = (ms)   => CHART_PAD_L + ((ms - xMin) / duration) * CHART_INNER_W;
+      const yPx  = (bar)  => CHART_PAD_T + (1 - Math.max(0, bar) / yScale) * CHART_INNER_H;
+      const yPxT = (degC) => {
+        const range = tAxisMax - tAxisMin;
+        return CHART_PAD_T + (1 - (degC - tAxisMin) / range) * CHART_INNER_H;
+      };
 
       // Path: filtra pontos dentro do range visivel + 1 vizinho de cada lado
-      // (mantem continuidade nas bordas e melhora performance pra zoom forte)
       let firstIdx = 0, lastIdx = points.length - 1;
       while (firstIdx < points.length - 1 && points[firstIdx + 1][0] < xMin) firstIdx++;
       while (lastIdx > 0 && points[lastIdx - 1][0] > xMax) lastIdx--;
 
       let d = '';
       let dMa = '';
+      let dTemp = '';
       for (let i = firstIdx; i <= lastIdx; i++) {
         const x = xPx(points[i][0]);
         const y = yPx(points[i][1]);
         d += (i === firstIdx ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
         const yMa = yPx(ma[i]);
         dMa += (i === firstIdx ? 'M' : 'L') + x.toFixed(1) + ',' + yMa.toFixed(1) + ' ';
+        if (hasTemp && isFinite(points[i][2])) {
+          const yT = yPxT(points[i][2]);
+          dTemp += (dTemp === '' ? 'M' : 'L') + x.toFixed(1) + ',' + yT.toFixed(1) + ' ';
+        }
       }
 
       // Labels X
@@ -811,7 +975,7 @@
         }
       }
 
-      // Labels Y
+      // Labels Y (esquerda: pressao em bar)
       const yLabels = [];
       const gridH = [];
       for (let i = 0; i <= 4; i++) {
@@ -821,6 +985,17 @@
                      '" text-anchor="end" class="cl">' + bar.toFixed(2) + '</text>');
         gridH.push('<line x1="' + CHART_PAD_L + '" x2="' + (CHART_W - CHART_PAD_R) +
                    '" y1="' + y + '" y2="' + y + '" class="cg"/>');
+      }
+
+      // Labels Y (direita: temperatura em degC), so se ha dados de temp
+      const yLabelsT = [];
+      if (hasTemp) {
+        for (let i = 0; i <= 4; i++) {
+          const y = CHART_PAD_T + (i * CHART_INNER_H) / 4;
+          const t = tAxisMax - (tAxisMax - tAxisMin) * (i / 4);
+          yLabelsT.push('<text x="' + (CHART_W - CHART_PAD_R + 4) + '" y="' + (y + 3) +
+                        '" text-anchor="start" class="clt">' + t.toFixed(1) + '</text>');
+        }
       }
 
       // Marcador de pico (so se estiver na janela visivel)
@@ -835,14 +1010,22 @@
             '" class="cpklbl">' + pMax.toFixed(2) + ' bar</text>';
       }
 
+      const tempPath  = (hasTemp && dTemp) ? '<path d="' + dTemp + '" class="ctemp"/>' : '';
+      const tempAxis  = hasTemp ? (
+        '<line x1="' + (CHART_W - CHART_PAD_R) + '" y1="' + CHART_PAD_T + '" x2="' +
+          (CHART_W - CHART_PAD_R) + '" y2="' + (CHART_H - CHART_PAD_B) + '" class="ca"/>'
+      ) : '';
+
       const svg =
         '<svg viewBox="0 0 ' + CHART_W + ' ' + CHART_H + '" preserveAspectRatio="none">' +
           '<style>' +
             '.cg{stroke:#1f2933;stroke-width:0.5}' +
             '.ca{stroke:#495057;stroke-width:1}' +
             '.cl{fill:#adb5bd;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
+            '.clt{fill:#dee2e6;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
             '.cline{stroke:#4dabf7;stroke-width:1.5;fill:none;stroke-linejoin:round}' +
             '.cma{stroke:#ffa94d;stroke-width:1.5;fill:none;stroke-linejoin:round}' +
+            '.ctemp{stroke:#dee2e6;stroke-width:1.2;fill:none;stroke-linejoin:round;opacity:0.85}' +
             '.cdot{fill:#ff6b6b;stroke:#1a1a1a;stroke-width:1}' +
             '.cpklbl{fill:#ff6b6b;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
           '</style>' +
@@ -851,7 +1034,9 @@
             '" y2="' + (CHART_H - CHART_PAD_B) + '" class="ca"/>' +
           '<line x1="' + CHART_PAD_L + '" y1="' + (CHART_H - CHART_PAD_B) + '" x2="' +
             (CHART_W - CHART_PAD_R) + '" y2="' + (CHART_H - CHART_PAD_B) + '" class="ca"/>' +
-          xLabels.join('') + yLabels.join('') +
+          tempAxis +
+          xLabels.join('') + yLabels.join('') + yLabelsT.join('') +
+          tempPath +
           '<path d="' + d + '" class="cline"/>' +
           '<path d="' + dMa + '" class="cma"/>' +
           peakMark +
@@ -862,9 +1047,12 @@
       const fullRange = tMax - tMin;
       const zoom = fullRange / duration;
       const zoomLabel = zoom > 1.05 ? ' | zoom ' + zoom.toFixed(1) + 'x' : '';
-      const legend =
-        '<span class="lg-line lg-blue"></span> leitura' +
-        ' &nbsp; <span class="lg-line lg-orange"></span> media movel (' + MA_WINDOW + ' pts)';
+      let legend =
+        '<span class="lg-line lg-blue"></span> pressao' +
+        ' &nbsp; <span class="lg-line lg-orange"></span> media (' + MA_WINDOW + ')';
+      if (hasTemp) {
+        legend += ' &nbsp; <span class="lg-line lg-gray"></span> temperatura';
+      }
       $('chartInfo').innerHTML =
         points.length + ' amostras | pico ' + pMax.toFixed(2) + ' bar | ' +
         'duracao ' + formatTime(fullRange / 1000) + zoomLabel +
