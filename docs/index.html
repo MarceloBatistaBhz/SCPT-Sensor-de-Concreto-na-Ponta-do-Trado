@@ -60,6 +60,13 @@
       margin-top: 0.25rem;
       word-break: break-word;
     }
+    .status-countdown {
+      font-size: 0.78rem;
+      color: #ffd43b;
+      margin-top: 0.4rem;
+      font-family: ui-monospace, "Consolas", monospace;
+      letter-spacing: 0.5px;
+    }
     .btn {
       width: 100%;
       padding: 1rem;
@@ -221,6 +228,7 @@
   <div class="status-card discon" id="statusCard">
     <div class="status-label">Estado</div>
     <div class="status-value" id="statusValue">Desconectado</div>
+    <div class="status-countdown" id="statusCountdown" hidden></div>
   </div>
 
   <button class="btn btn-primary" id="btnConnect">Conectar via Bluetooth</button>
@@ -273,7 +281,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v8 &middot; grafico com media movel (50 pts) &middot; Chrome/Edge no Android</p>
+  <p class="footer">v9 &middot; countdown da sessao no card &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -321,6 +329,10 @@
     let chartLastTapMs = 0;
     let chartRafPend   = false;
 
+    // Countdown da sessao (auto-stop em 2h)
+    let countdownAnchor = null;  // { remainingS, anchorMs }
+    let countdownTimer  = null;  // setInterval id
+
     function logLine(msg, cls) {
       const el = document.createElement('div');
       el.className = 'log-line' + (cls ? ' ' + cls : '');
@@ -330,22 +342,59 @@
       $('log').scrollTop = $('log').scrollHeight;
     }
 
+    function formatHMS(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+    function tickCountdown() {
+      if (!countdownAnchor) return;
+      const elapsed   = (Date.now() - countdownAnchor.anchorMs) / 1000;
+      const remaining = Math.max(0, Math.round(countdownAnchor.remainingS - elapsed));
+      $('statusCountdown').hidden      = false;
+      $('statusCountdown').textContent = 'Auto-stop em ' + formatHMS(remaining);
+    }
+    function startCountdown(remainingS) {
+      countdownAnchor = { remainingS: remainingS, anchorMs: Date.now() };
+      if (!countdownTimer) countdownTimer = setInterval(tickCountdown, 1000);
+      tickCountdown();
+    }
+    function stopCountdown() {
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      countdownAnchor = null;
+      $('statusCountdown').hidden = true;
+      $('statusCountdown').textContent = '';
+    }
+
     function applyState(text) {
-      $('statusValue').textContent = text;
+      // Extrai r=NNN (segundos restantes) e remove do texto exibido
+      const matchR = text.match(/\s*r=(\d+)/);
+      const remainingS = matchR ? parseInt(matchR[1], 10) : null;
+      const visibleText = matchR ? text.replace(/\s*r=\d+/, '') : text;
+
+      $('statusValue').textContent = visibleText;
+
+      // Countdown so durante COLL com r= valido
+      if (remainingS !== null && visibleText.startsWith('COLL')) {
+        startCountdown(remainingS);
+      } else {
+        stopCountdown();
+      }
 
       const card = $('statusCard');
       let cls = 'idle';
-      if      (text.startsWith('COLL'))   cls = 'collect';
-      else if (text.startsWith('READY'))  cls = 'ready';
-      else if (text.startsWith('WIFI'))   cls = 'serving';
-      else if (text === 'Reconectando')   cls = 'reconn';
-      else if (text === 'Desconectado')   cls = 'discon';
+      if      (visibleText.startsWith('COLL'))   cls = 'collect';
+      else if (visibleText.startsWith('READY'))  cls = 'ready';
+      else if (visibleText.startsWith('WIFI'))   cls = 'serving';
+      else if (visibleText === 'Reconectando')   cls = 'reconn';
+      else if (visibleText === 'Desconectado')   cls = 'discon';
       card.className = 'status-card ' + cls;
 
-      const isIdle    = (text === 'IDLE');
-      const isCollect = text.startsWith('COLL');
-      const isReady   = text.startsWith('READY');
-      const isServing = text.startsWith('WIFI');
+      const isIdle    = (visibleText === 'IDLE');
+      const isCollect = visibleText.startsWith('COLL');
+      const isReady   = visibleText.startsWith('READY');
+      const isServing = visibleText.startsWith('WIFI');
       const connected = !!cmdChar;
       const isStreaming = streamTotal > 0;
 
