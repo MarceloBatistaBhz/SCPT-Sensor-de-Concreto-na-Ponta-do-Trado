@@ -67,6 +67,13 @@
       font-family: ui-monospace, "Consolas", monospace;
       letter-spacing: 0.5px;
     }
+    .status-started {
+      font-size: 0.78rem;
+      color: #adb5bd;
+      margin-top: 0.4rem;
+      font-family: ui-monospace, "Consolas", monospace;
+      letter-spacing: 0.5px;
+    }
     .btn {
       width: 100%;
       padding: 1rem;
@@ -228,6 +235,7 @@
   <div class="status-card discon" id="statusCard">
     <div class="status-label">Estado</div>
     <div class="status-value" id="statusValue">Desconectado</div>
+    <div class="status-started" id="statusStarted" hidden></div>
     <div class="status-countdown" id="statusCountdown" hidden></div>
   </div>
 
@@ -281,7 +289,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v9 &middot; countdown da sessao no card &middot; Chrome/Edge no Android</p>
+  <p class="footer">v10 &middot; horario de inicio + countdown &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -330,8 +338,10 @@
     let chartRafPend   = false;
 
     // Countdown da sessao (auto-stop em 2h)
+    const SESSION_MAX_S = 7200;  // bate com SESSION_MAX_MS no firmware
     let countdownAnchor = null;  // { remainingS, anchorMs }
     let countdownTimer  = null;  // setInterval id
+    let sessionStartedAt = null; // Date — hora local de inicio da coleta
 
     function logLine(msg, cls) {
       const el = document.createElement('div');
@@ -378,8 +388,24 @@
       // Countdown so durante COLL com r= valido
       if (remainingS !== null && visibleText.startsWith('COLL')) {
         startCountdown(remainingS);
+        // Recalcula horario de inicio: agora - tempo ja decorrido
+        const elapsedS = SESSION_MAX_S - remainingS;
+        sessionStartedAt = new Date(Date.now() - elapsedS * 1000);
       } else {
         stopCountdown();
+      }
+      // Limpa horario de inicio quando a sessao se foi de vez
+      if (visibleText === 'IDLE' || visibleText === 'Desconectado' ||
+          visibleText === 'Reconectando') {
+        sessionStartedAt = null;
+      }
+      if (sessionStartedAt) {
+        $('statusStarted').hidden = false;
+        $('statusStarted').textContent =
+          'Iniciada as ' + sessionStartedAt.toLocaleTimeString('pt-BR');
+      } else {
+        $('statusStarted').hidden = true;
+        $('statusStarted').textContent = '';
       }
 
       const card = $('statusCard');
