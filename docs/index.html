@@ -211,6 +211,54 @@
       margin-top: 0.5rem;
       text-align: center;
     }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-card {
+      background: #2a2a2a;
+      border-radius: 14px;
+      padding: 1.5rem 1.75rem;
+      width: min(86%, 320px);
+      text-align: center;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    }
+    .modal-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #f0f0f0;
+    }
+    .modal-progress-track {
+      background: #0a0a0a;
+      height: 12px;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    .modal-progress-fill {
+      background: linear-gradient(90deg, #51cf66, #4dabf7);
+      height: 100%;
+      width: 0%;
+    }
+    .modal-progress-fill.fill {
+      width: 100%;
+      transition: width 3s linear;
+    }
+    .modal-check {
+      color: #51cf66;
+      font-size: 1.7rem;
+      margin-top: 0.6rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      line-height: 1;
+    }
+    .modal-check.visible { opacity: 1; }
     details {
       background: #2a2a2a;
       border-radius: 8px;
@@ -317,7 +365,17 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v11.1 &middot; nome do CSV em hora local &middot; Chrome/Edge no Android</p>
+  <p class="footer">v12 &middot; TARE automatico em "Iniciar coleta" &middot; Chrome/Edge no Android</p>
+
+  <div class="modal-overlay" id="tareModal" hidden>
+    <div class="modal-card">
+      <div class="modal-title">Calibrando sensor</div>
+      <div class="modal-progress-track">
+        <div class="modal-progress-fill" id="tareProgress"></div>
+      </div>
+      <div class="modal-check" id="tareCheck">&#10003;</div>
+    </div>
+  </div>
 
   <script>
     'use strict';
@@ -1064,7 +1122,44 @@
       // Tem device mas nao esta conectado nem reconectando — reconecta na hora.
       startReconnectLoop();
     };
-    $('btnStart').onclick       = () => sendCmd('START');
+
+    // "Iniciar coleta" -> dispara TARE primeiro, mostra popup de calibracao
+    // por exatamente 3 s (animacao fixa, nao acompanha tempo real do tare),
+    // depois envia START. O firmware completa o tare em ~1.3 s, bem antes
+    // do START chegar.
+    let tareInProgress = false;
+    async function performTareAndStart() {
+      if (tareInProgress) return;
+      tareInProgress = true;
+
+      const modal = $('tareModal');
+      const fill  = $('tareProgress');
+      const check = $('tareCheck');
+
+      // Reseta estado visual
+      fill.classList.remove('fill');
+      check.classList.remove('visible');
+      modal.hidden = false;
+
+      // Manda TARE pro firmware (assincrono, processa em ~1.3 s)
+      sendCmd('TARE');
+
+      // Forca o browser a renderizar o estado inicial (0%) antes de animar
+      void fill.offsetWidth;
+      fill.classList.add('fill');   // dispara transicao de 3 s
+
+      await new Promise((r) => setTimeout(r, 3000));
+      check.classList.add('visible');
+      await new Promise((r) => setTimeout(r, 500));
+
+      modal.hidden = true;
+      tareInProgress = false;
+
+      // Por fim, inicia a coleta de fato
+      sendCmd('START');
+    }
+
+    $('btnStart').onclick       = performTareAndStart;
     $('btnStop').onclick        = () => sendCmd('STOP');
     $('btnDownloadBle').onclick = startBleDownload;
     $('btnCloseChart').onclick  = hideChart;
