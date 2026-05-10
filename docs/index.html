@@ -54,6 +54,24 @@
       color: #adb5bd;
       letter-spacing: 1px;
     }
+    .status-row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .status-battery {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.72rem;
+      font-family: ui-monospace, "Consolas", monospace;
+      letter-spacing: 0.3px;
+    }
+    .status-battery svg { width: 26px; height: 12px; }
+    .bat-ok  { color: #51cf66; }
+    .bat-mid { color: #ffd43b; }
+    .bat-low { color: #ff6b6b; }
     .status-value {
       font-size: 1.4rem;
       font-weight: 600;
@@ -233,7 +251,17 @@
   <h1>Logger Pressao SCPT</h1>
 
   <div class="status-card discon" id="statusCard">
-    <div class="status-label">Estado</div>
+    <div class="status-row-top">
+      <span class="status-label">Estado</span>
+      <span class="status-battery" id="statusBattery" hidden>
+        <svg viewBox="0 0 26 12" fill="currentColor" aria-hidden="true">
+          <rect x="0.5" y="0.5" width="22" height="11" rx="1.5" fill="none" stroke="currentColor"/>
+          <rect x="23" y="3.5" width="2" height="5" rx="0.5"/>
+          <rect id="batteryFill" x="2" y="2" width="0" height="8"/>
+        </svg>
+        <span id="batteryText">--</span>
+      </span>
+    </div>
     <div class="status-value" id="statusValue">Desconectado</div>
     <div class="status-started" id="statusStarted" hidden></div>
     <div class="status-countdown" id="statusCountdown" hidden></div>
@@ -289,7 +317,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v10 &middot; horario de inicio + countdown &middot; Chrome/Edge no Android</p>
+  <p class="footer">v11 &middot; indicador de bateria &middot; Chrome/Edge no Android</p>
 
   <script>
     'use strict';
@@ -358,6 +386,37 @@
       const s = seconds % 60;
       return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
     }
+
+    // Curva LiPo aproximada (mV -> %). Linear por trechos.
+    const BATTERY_CURVE = [
+      [4200, 100], [4050, 80], [3900, 60],
+      [3800, 40],  [3700, 25], [3550, 10], [3300, 0],
+    ];
+    function batteryPercent(mv) {
+      if (mv >= BATTERY_CURVE[0][0]) return 100;
+      if (mv <= BATTERY_CURVE[BATTERY_CURVE.length - 1][0]) return 0;
+      for (let i = 0; i < BATTERY_CURVE.length - 1; i++) {
+        const [v1, p1] = BATTERY_CURVE[i];
+        const [v2, p2] = BATTERY_CURVE[i + 1];
+        if (mv <= v1 && mv >= v2) {
+          const frac = (mv - v2) / (v1 - v2);
+          return Math.round(p2 + frac * (p1 - p2));
+        }
+      }
+      return 0;
+    }
+    function updateBattery(mv) {
+      if (mv === null || mv < 2500) {
+        $('statusBattery').hidden = true;
+        return;
+      }
+      const pct = batteryPercent(mv);
+      const cls = pct > 50 ? 'bat-ok' : (pct > 20 ? 'bat-mid' : 'bat-low');
+      $('statusBattery').className = 'status-battery ' + cls;
+      $('statusBattery').hidden = false;
+      $('batteryText').textContent = pct + '% · ' + (mv / 1000).toFixed(2) + 'V';
+      $('batteryFill').setAttribute('width', (19 * pct / 100).toFixed(1));
+    }
     function tickCountdown() {
       if (!countdownAnchor) return;
       const elapsed   = (Date.now() - countdownAnchor.anchorMs) / 1000;
@@ -378,12 +437,16 @@
     }
 
     function applyState(text) {
-      // Extrai r=NNN (segundos restantes) e remove do texto exibido
+      // Extrai r=NNN (segundos restantes) e b=NNNN (bateria mV) e remove
+      // ambos do texto exibido pra deixar limpo (ex.: "COLL 1Hz n=42")
       const matchR = text.match(/\s*r=(\d+)/);
+      const matchB = text.match(/\s*b=(\d+)/);
       const remainingS = matchR ? parseInt(matchR[1], 10) : null;
-      const visibleText = matchR ? text.replace(/\s*r=\d+/, '') : text;
+      const batteryMv  = matchB ? parseInt(matchB[1], 10) : null;
+      const visibleText = text.replace(/\s*r=\d+/, '').replace(/\s*b=\d+/, '');
 
       $('statusValue').textContent = visibleText;
+      updateBattery(batteryMv);
 
       // Countdown so durante COLL com r= valido
       if (remainingS !== null && visibleText.startsWith('COLL')) {
