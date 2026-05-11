@@ -49,6 +49,14 @@
       0%, 100% { border-left-color: #ffa94d; }
       50%      { border-left-color: #ff922b; }
     }
+    /* Halo amarelo ao entrar em COLL (one-shot) */
+    .status-card.coll-enter {
+      animation: collEnter 0.7s ease-out;
+    }
+    @keyframes collEnter {
+      0%   { box-shadow: 0 0 0 0 rgba(255, 212, 59, 0.55); }
+      100% { box-shadow: 0 0 0 14px rgba(255, 212, 59, 0); }
+    }
     .status-label {
       font-size: 0.75rem;
       text-transform: uppercase;
@@ -60,6 +68,34 @@
       justify-content: space-between;
       align-items: center;
       gap: 0.5rem;
+      transition: justify-content 0.2s;
+    }
+    .status-row-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .big-toggle {
+      background: transparent;
+      border: 1px solid #495057;
+      color: #adb5bd;
+      border-radius: 6px;
+      width: 32px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.08s;
+      touch-action: manipulation;
+    }
+    .big-toggle:active { transform: scale(0.92); }
+    .big-toggle svg { width: 16px; height: 16px; display: block; }
+    .status-card.big-mode .big-toggle {
+      background: #4dabf7;
+      color: #1a1a1a;
+      border-color: #4dabf7;
     }
     .status-battery {
       display: inline-flex;
@@ -93,9 +129,35 @@
       font-family: ui-monospace, "Consolas", monospace;
       letter-spacing: 0.3px;
       font-weight: 600;
+      transition: font-size 0.25s ease;
     }
     .status-live .lv-p { color: #4dabf7; }
     .status-live .lv-t { color: #dee2e6; }
+    .status-live .lv-sep { color: #6c757d; }
+
+    /* Big numbers mode */
+    .status-card.big-mode .status-label,
+    .status-card.big-mode .status-value { display: none; }
+    .status-card.big-mode .status-row-top { justify-content: flex-end; }
+    .status-card.big-mode .status-live {
+      text-align: center;
+      margin-top: 0.4rem;
+      margin-bottom: 0.2rem;
+    }
+    .status-card.big-mode .status-live .lv-p {
+      display: block;
+      font-size: 3rem;
+      line-height: 1.05;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    .status-card.big-mode .status-live .lv-t {
+      display: block;
+      font-size: 1.25rem;
+      margin-top: 0.1rem;
+      opacity: 0.9;
+    }
+    .status-card.big-mode .status-live .lv-sep { display: none; }
     .status-sparkline {
       margin-top: 0.6rem;
       border-top: 1px solid #1f2933;
@@ -315,6 +377,61 @@
       font-size: 0.75rem;
       margin-top: 0.5rem;
     }
+
+    /* Fade-in suave em elementos que aparecem dinamicamente.
+       Quando [hidden] e removido, o elemento volta a casar
+       :not([hidden]) e a animacao roda de novo. */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-3px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .progress:not([hidden]),
+    .chart:not([hidden]),
+    .hint:not([hidden]),
+    .status-live:not([hidden]),
+    .status-sparkline:not([hidden]),
+    .status-countdown:not([hidden]),
+    .status-started:not([hidden]),
+    .status-battery:not([hidden]),
+    .big-toggle:not([hidden]) {
+      animation: fadeIn 0.28s ease-out;
+    }
+    /* Botoes com transicao consistente */
+    .btn { transition: opacity 0.18s, transform 0.08s, background 0.2s; }
+
+    /* Toast notifications */
+    .toast-container {
+      position: fixed;
+      top: 0.75rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      pointer-events: none;
+      width: min(92%, 360px);
+    }
+    .toast {
+      background: #2a2a2a;
+      color: #f0f0f0;
+      padding: 0.65rem 0.9rem;
+      border-radius: 8px;
+      border-left: 4px solid #6c757d;
+      font-size: 0.85rem;
+      line-height: 1.3;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transform: translateY(-14px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      pointer-events: auto;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.hide { opacity: 0; transform: translateY(-14px); }
+    .toast.success { border-left-color: #51cf66; }
+    .toast.error   { border-left-color: #ff6b6b; }
+    .toast.warning { border-left-color: #ffd43b; }
+    .toast.info    { border-left-color: #4dabf7; }
   </style>
 </head>
 <body>
@@ -323,13 +440,20 @@
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
       <span class="status-label">Estado</span>
-      <span class="status-battery" id="statusBattery" hidden>
-        <svg viewBox="0 0 26 12" fill="currentColor" aria-hidden="true">
-          <rect x="0.5" y="0.5" width="22" height="11" rx="1.5" fill="none" stroke="currentColor"/>
-          <rect x="23" y="3.5" width="2" height="5" rx="0.5"/>
-          <rect id="batteryFill" x="2" y="2" width="0" height="8"/>
-        </svg>
-        <span id="batteryText">--</span>
+      <span class="status-row-right">
+        <span class="status-battery" id="statusBattery" hidden>
+          <svg viewBox="0 0 26 12" fill="currentColor" aria-hidden="true">
+            <rect x="0.5" y="0.5" width="22" height="11" rx="1.5" fill="none" stroke="currentColor"/>
+            <rect x="23" y="3.5" width="2" height="5" rx="0.5"/>
+            <rect id="batteryFill" x="2" y="2" width="0" height="8"/>
+          </svg>
+          <span id="batteryText">--</span>
+        </span>
+        <button id="btnBigMode" class="big-toggle" aria-label="Alternar numeros grandes" title="Alternar numeros grandes" hidden>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
+          </svg>
+        </button>
       </span>
     </div>
     <div class="status-value" id="statusValue">Desconectado</div>
@@ -389,7 +513,9 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v13 &middot; temperatura + sparkline + valores ao vivo &middot; Chrome/Edge no Android</p>
+  <p class="footer">v14 &middot; stats + numeros grandes + toasts + animacoes &middot; Chrome/Edge no Android</p>
+
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
   <div class="modal-overlay" id="tareModal" hidden>
     <div class="modal-card">
@@ -468,6 +594,43 @@
       $('log').scrollTop = $('log').scrollHeight;
     }
 
+    // === Toast notifications ===
+    function showToast(msg, type, duration) {
+      type = type || 'info';
+      duration = duration || 3200;
+      const c = $('toastContainer');
+      if (!c) return;
+      const t = document.createElement('div');
+      t.className = 'toast ' + type;
+      t.textContent = msg;
+      c.appendChild(t);
+      requestAnimationFrame(() => t.classList.add('show'));
+      setTimeout(() => {
+        t.classList.remove('show');
+        t.classList.add('hide');
+        setTimeout(() => t.remove(), 320);
+      }, duration);
+    }
+
+    // === Big numbers mode (persistido em localStorage) ===
+    function getBigMode() {
+      try { return localStorage.getItem('loggerBigMode') === '1'; } catch (_) { return false; }
+    }
+    function setBigModePref(on) {
+      try { localStorage.setItem('loggerBigMode', on ? '1' : '0'); } catch (_) {}
+    }
+    function applyBigMode() {
+      if (getBigMode()) $('statusCard').classList.add('big-mode');
+      else              $('statusCard').classList.remove('big-mode');
+    }
+    function toggleBigMode() {
+      setBigModePref(!getBigMode());
+      applyBigMode();
+    }
+
+    // Tracking de bateria pra avisar so na transicao 20% -> abaixo
+    let lastBatteryPct = null;
+
     function formatHMS(seconds) {
       const h = Math.floor(seconds / 3600);
       const m = Math.floor((seconds % 3600) / 60);
@@ -504,6 +667,11 @@
       $('statusBattery').hidden = false;
       $('batteryText').textContent = pct + '% · ' + (mv / 1000).toFixed(2) + 'V';
       $('batteryFill').setAttribute('width', (19 * pct / 100).toFixed(1));
+      // Toast so na transicao para <20% (evita repetir a cada notify)
+      if (lastBatteryPct !== null && lastBatteryPct >= 20 && pct < 20) {
+        showToast('Bateria baixa (' + pct + '%)', 'warning', 5000);
+      }
+      lastBatteryPct = pct;
     }
     function tickCountdown() {
       if (!countdownAnchor) return;
@@ -626,16 +794,19 @@
       lastSeenState = visibleText;
 
       // Live values + sparkline durante COLL
-      if (isColl && livePres !== null && liveTemp !== null) {
+      const hasLive = isColl && livePres !== null && liveTemp !== null;
+      if (hasLive) {
         $('statusLive').hidden = false;
         $('statusLive').innerHTML =
           '<span class="lv-p">' + livePres.toFixed(1) + ' bar</span>' +
-          ' &middot; ' +
+          '<span class="lv-sep"> &middot; </span>' +
           '<span class="lv-t">' + liveTemp.toFixed(1) + ' &deg;C</span>';
         pushLiveSample(livePres, liveTemp);
       } else {
         $('statusLive').hidden = true;
       }
+      // Botao big-mode so faz sentido quando ha live data
+      $('btnBigMode').hidden = !hasLive;
 
       // Countdown so durante COLL com r= valido
       if (remainingS !== null && visibleText.startsWith('COLL')) {
@@ -667,7 +838,16 @@
       else if (visibleText.startsWith('WIFI'))   cls = 'serving';
       else if (visibleText === 'Reconectando')   cls = 'reconn';
       else if (visibleText === 'Desconectado')   cls = 'discon';
-      card.className = 'status-card ' + cls;
+      // Troca so as classes de estado, preserva big-mode etc.
+      card.classList.remove('idle', 'collect', 'ready', 'serving', 'discon', 'reconn');
+      card.classList.add(cls);
+      // Pulse one-shot quando entra em COLL
+      if (isColl && !wasColl) {
+        card.classList.remove('coll-enter');
+        void card.offsetWidth;            // forca reflow pra re-disparar a animacao
+        card.classList.add('coll-enter');
+        setTimeout(() => card.classList.remove('coll-enter'), 750);
+      }
 
       const isIdle    = (visibleText === 'IDLE');
       const isCollect = visibleText.startsWith('COLL');
@@ -756,6 +936,7 @@
       if (streamWatchdog) clearTimeout(streamWatchdog);
       streamWatchdog = setTimeout(() => {
         logLine('Timeout no streaming, abortando.', 'err');
+        showToast('Timeout no download', 'error');
         resetStream();
       }, STREAM_TIMEOUT_MS);
 
@@ -763,6 +944,7 @@
         // Primeiro chunk = header de 4 bytes com tamanho total
         if (chunk.length !== 4) {
           logLine('Header de stream invalido (' + chunk.length + ' bytes)', 'err');
+          showToast('Header de stream invalido', 'error');
           resetStream();
           return;
         }
@@ -771,6 +953,7 @@
         streamChunks = [];
         if (streamTotal === 0) {
           logLine('Log esta vazio.', 'err');
+          showToast('Log esta vazio', 'warning');
           resetStream();
           return;
         }
@@ -804,6 +987,7 @@
       const file = new File([blob], fname, { type: 'text/csv' });
 
       logLine('Transferencia completa (' + streamReceived + ' bytes).', 'ok');
+      showToast('Download completo (' + (streamReceived / 1024).toFixed(1) + ' KB)', 'success');
 
       // Renderiza grafico antes do share, pra que ja esteja na tela
       // quando o usuario voltar do share sheet.
@@ -872,15 +1056,36 @@
       if (points.length < 2) return null;
 
       let pMax = -Infinity, pMaxIdx = 0;
+      let pMin = Infinity;
+      let sum = 0, sumSq = 0;
+      const sortedP = new Array(points.length);
       for (let i = 0; i < points.length; i++) {
-        if (points[i][1] > pMax) { pMax = points[i][1]; pMaxIdx = i; }
+        const v = points[i][1];
+        if (v > pMax) { pMax = v; pMaxIdx = i; }
+        if (v < pMin) pMin = v;
+        sum += v;
+        sumSq += v * v;
+        sortedP[i] = v;
       }
+      const n = points.length;
+      const pMean = sum / n;
+      // variancia populacional; clamp em 0 pra evitar sqrt de negativo por arredondamento
+      const pVar = Math.max(0, sumSq / n - pMean * pMean);
+      const pStd = Math.sqrt(pVar);
+      sortedP.sort((a, b) => a - b);
+      const pMedian = (n % 2 === 0)
+        ? (sortedP[n / 2 - 1] + sortedP[n / 2]) / 2
+        : sortedP[(n - 1) / 2];
 
       // Eixo de temperatura: centrado em T_init, minimo +/- 5 °C
-      let tInit = NaN, tAxisMin = NaN, tAxisMax = NaN;
+      let tInit = NaN, tFinal = NaN, tAxisMin = NaN, tAxisMax = NaN;
       if (hasTemp) {
         // Acha primeiro temp valido pra ser T_init
         for (const p of points) { if (isFinite(p[2])) { tInit = p[2]; break; } }
+        // Ultimo temp valido = T_final
+        for (let i = points.length - 1; i >= 0; i--) {
+          if (isFinite(points[i][2])) { tFinal = points[i][2]; break; }
+        }
         let tMinV = Infinity, tMaxV = -Infinity;
         for (const p of points) {
           if (isFinite(p[2])) {
@@ -897,10 +1102,15 @@
         ma: computeMA(points, MA_WINDOW),
         pMax,
         pMaxIdx,
+        pMin,
+        pMean,
+        pMedian,
+        pStd,
         tMin: points[0][0],
         tMax: points[points.length - 1][0],
         hasTemp,
         tInit,
+        tFinal,
         tAxisMin,
         tAxisMax,
       };
@@ -928,8 +1138,9 @@
 
     function drawChart() {
       if (!chartData || !chartView) return;
-      const { points, ma, pMax, pMaxIdx, tMin, tMax,
-              hasTemp, tAxisMin, tAxisMax } = chartData;
+      const { points, ma, pMax, pMaxIdx, pMin, pMean, pMedian, pStd,
+              tMin, tMax,
+              hasTemp, tInit, tFinal, tAxisMin, tAxisMax } = chartData;
       const { xMin, xMax } = chartView;
       const duration = Math.max(1, xMax - xMin);
       const yScale = Math.max(pMax, 0.1);
@@ -1047,15 +1258,33 @@
       const fullRange = tMax - tMin;
       const zoom = fullRange / duration;
       const zoomLabel = zoom > 1.05 ? ' | zoom ' + zoom.toFixed(1) + 'x' : '';
+      const peakS = (points[pMaxIdx][0] - tMin) / 1000;
       let legend =
         '<span class="lg-line lg-blue"></span> pressao' +
         ' &nbsp; <span class="lg-line lg-orange"></span> media (' + MA_WINDOW + ')';
       if (hasTemp) {
         legend += ' &nbsp; <span class="lg-line lg-gray"></span> temperatura';
       }
+
+      // Linha 1: resumo da janela inteira
+      const line1 = points.length + ' amostras | pico ' + pMax.toFixed(2) + ' bar @ ' +
+        formatTime(peakS) + ' | duracao ' + formatTime(fullRange / 1000) + zoomLabel;
+      // Linha 2: estatisticas da pressao
+      const line2 = 'media ' + pMean.toFixed(2) + ' &middot; mediana ' + pMedian.toFixed(2) +
+        ' &middot; &sigma; ' + pStd.toFixed(2) +
+        ' &middot; min ' + pMin.toFixed(2) + ' &middot; max ' + pMax.toFixed(2) + ' bar';
+      // Linha 3: temperatura (se houver)
+      let line3 = '';
+      if (hasTemp && isFinite(tInit) && isFinite(tFinal)) {
+        const dT = tFinal - tInit;
+        const sgn = dT >= 0 ? '+' : '';
+        line3 = 'temp ' + tInit.toFixed(1) + '&deg;C &rarr; ' + tFinal.toFixed(1) +
+          '&deg;C (&Delta;' + sgn + dT.toFixed(1) + '&deg;C)';
+      }
+
       $('chartInfo').innerHTML =
-        points.length + ' amostras | pico ' + pMax.toFixed(2) + ' bar | ' +
-        'duracao ' + formatTime(fullRange / 1000) + zoomLabel +
+        line1 + '<br>' + line2 +
+        (line3 ? '<br>' + line3 : '') +
         '<br>' + legend;
     }
 
@@ -1214,6 +1443,7 @@
       // Watchdog inicial — se o header nao chegar em 5s, aborta
       streamWatchdog = setTimeout(() => {
         logLine('Sem resposta do logger, abortando.', 'err');
+        showToast('Sem resposta do logger', 'error');
         resetStream();
       }, 5000);
     }
@@ -1246,8 +1476,12 @@
         setConnectedUi();
         await acquireWakeLock();
         logLine('Conectado.', 'ok');
+        showToast('Conectado a ' + device.name, 'success');
       } catch (e) {
         logLine('Erro: ' + e.message, 'err');
+        if (e.name !== 'NotFoundError') {
+          showToast('Falha ao conectar', 'error');
+        }
       }
     }
 
@@ -1259,6 +1493,7 @@
         stopReconnectLoop();
         setConnectedUi();
         logLine('Reconectado.', 'ok');
+        showToast('Reconectado', 'success');
       } catch (e) {
         logLine('Tentativa falhou: ' + e.message, 'err');
         // continua tentando no proximo tick do interval
@@ -1292,6 +1527,7 @@
 
     function onDisconnected() {
       logLine('Dispositivo desconectado', 'err');
+      showToast('Conexao perdida', 'warning', 2500);
       cmdChar  = null;
       statChar = null;
       dataChar = null;
@@ -1343,6 +1579,7 @@
 
       modal.hidden = true;
       tareInProgress = false;
+      showToast('Calibracao OK', 'success', 2000);
 
       // Por fim, inicia a coleta de fato
       sendCmd('START');
@@ -1355,9 +1592,16 @@
     $('btnDownload').onclick    = () => sendCmd('DOWNLOAD');
     $('btnStopWifi').onclick    = () => sendCmd('STOPWIFI');
     $('btnErase').onclick     = () => {
-      if (confirm('Apagar log.csv? Acao nao pode ser desfeita.')) sendCmd('ERASE');
+      if (confirm('Apagar log.csv? Acao nao pode ser desfeita.')) {
+        sendCmd('ERASE');
+        showToast('Log apagado', 'success', 2500);
+      }
     };
     $('btnOpenCsv').onclick   = () => window.open(CSV_URL, '_blank', 'noopener');
+    $('btnBigMode').onclick   = toggleBigMode;
+
+    // Aplica preferencia salva ao carregar
+    applyBigMode();
 
     if (!navigator.bluetooth) {
       $('btnConnect').textContent = 'Web Bluetooth nao suportado';
