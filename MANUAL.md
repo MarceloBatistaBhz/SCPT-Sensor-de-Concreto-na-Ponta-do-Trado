@@ -119,7 +119,27 @@ A taxa alterna automaticamente entre 1 Hz (regime estável) e 5 Hz (variações 
 
 **Comportamento de campo (trado descendo):** se o celular sair de alcance (equipamento desce abaixo da superfície), a conexão BLE cai e a PWA mostra "Reconectando...". O equipamento **continua coletando normalmente**. Quando voltar para perto, a PWA reconecta sozinha em até 4 s.
 
-### 7.4 Parar coleta
+### 7.4 Marcar momento (anotações na timeline)
+
+Durante a coleta, aparece o botão **"Marcar momento"** (laranja). Toque para abrir um modal com 5 opções fixas:
+
+| Opção | Cor | Quando usar |
+|---|---|---|
+| Inicio perfuracao | Azul | Trado começou a descer |
+| Fim perfuracao | Azul | Trado chegou à cota final |
+| Inicio concretagem | Verde | Bomba começou a injetar concreto |
+| Fim concretagem | Verde | Concretagem encerrada |
+| Outra situacao | Cinza | Evento não previsto (anote depois no relatório) |
+
+Toque na opção desejada → toast confirma "Marcado: ..." → o modal fecha.
+
+**O que acontece:** a próxima amostra registrada no CSV vai ter o texto da anotação na **4ª coluna**. No gráfico final, aparece uma linha vertical tracejada na cor da categoria com o texto rotacionado ao lado.
+
+**Atraso entre o toque e a gravação:** ≤ 1 segundo em 1 Hz, ≤ 200 ms em 5 Hz. Para registrar eventos com precisão fina, toque um pouco antes do momento exato.
+
+**Quantas anotações pode fazer?** Quantas quiser. Cada uma é uma linha no CSV.
+
+### 7.5 Parar coleta
 
 Toque em **"Parar coleta"** (botão amarelo). Estado muda para `READY n=...` com a contagem total.
 
@@ -127,7 +147,7 @@ Alternativamente, a coleta para automaticamente:
 - Após **2 horas** (limite máximo de sessão).
 - Quando a bateria descarrega.
 
-### 7.5 Baixar e compartilhar (1 toque)
+### 7.6 Baixar e compartilhar (1 toque)
 
 Toque em **"Baixar e compartilhar"** (botão azul).
 
@@ -137,27 +157,29 @@ Toque em **"Baixar e compartilhar"** (botão azul).
 
 O nome do arquivo já vem com data/hora: `log_2026-05-10T14-32-01.csv`.
 
-### 7.6 Ver gráfico
+### 7.7 Ver gráfico
 
 Após o download, o gráfico aparece automaticamente abaixo da barra de progresso. Mostra:
 
 - **Linha azul:** pressão (bar) ao longo do tempo
 - **Linha laranja:** média móvel das últimas 50 leituras (suaviza ruído, mostra tendência)
+- **Linha cinza:** temperatura (°C), eixo Y secundário à direita
 - **Bolinha vermelha:** pico de pressão da sessão, com o valor numérico
-- **Info:** total de amostras, pico, duração
+- **Linhas verticais tracejadas coloridas:** anotações de "Marcar momento" (ver 7.4) — azul para perfuração, verde para concretagem, cinza para outras
+- **Info:** total de amostras, pico (com tempo), duração, contagem de anotações, média/mediana/desvio padrão da pressão, temperatura inicial→final com ΔT
 
 **Gestos no gráfico:**
 - **Pinça** com 2 dedos: zoom no eixo de tempo
 - **Arrasta** com 1 dedo (depois de zoomar): mover dentro do range zoomado
 - **Toque duplo:** voltar à visão completa
 
-### 7.7 Apagar e iniciar nova sessão
+### 7.8 Apagar e iniciar nova sessão
 
 Não é necessário apagar manualmente — toque em **"Iniciar coleta"** novamente e o equipamento substitui o log anterior.
 
 Se quiser apagar sem iniciar nova sessão, expanda **"Avançado"** e toque em **"Apagar log atual"**.
 
-### 7.8 Download via Wi-Fi (fallback)
+### 7.9 Download via Wi-Fi (fallback)
 
 Caso o BLE file transfer falhe (link instável, arquivo muito grande, etc.), há fallback via Wi-Fi:
 
@@ -173,28 +195,40 @@ Caso o BLE file transfer falhe (link instável, arquivo muito grande, etc.), há
 ## 8. Formato do arquivo `log.csv`
 
 ```
-ms;bar
-0;0.0
-1000;0.0
-2000;0.0
-2200;0.5
-2400;0.7
+ms;bar;degC;note
+0;0.0;25.4;
+1000;0.0;25.4;
+2000;0.0;25.5;inicio perfuracao
+2200;0.5;25.5;
+2400;0.7;25.5;
 ...
 ```
 
 | Coluna | Conteúdo |
 |---|---|
-| `ms` | Tempo em milissegundos desde o início da sessão (`Iniciar coleta`). |
-| `bar` | Pressão **manométrica** em bar (0 = atmosférica). 1 casa decimal. |
+| `ms`   | Tempo em milissegundos desde o início da sessão (`Iniciar coleta`). |
+| `bar`  | Pressão **manométrica** em bar (0 = atmosférica). 1 casa decimal. |
+| `degC` | Temperatura do sensor em °C. 1 casa decimal. |
+| `note` | Texto da anotação (ver 7.4). Vazio em quase todas as linhas. |
 
 Separador: **ponto e vírgula** (`;`). Casa decimal: **ponto** (`.`).
 Compatível com Excel BR (Importar de Texto, separador `;`).
+
+**Valores possíveis na coluna `note`:**
+
+- (vazio) — amostra normal
+- `inicio perfuracao`
+- `fim perfuracao`
+- `inicio concretagem`
+- `fim concretagem`
+- `outra`
 
 **Observações importantes:**
 
 - O timestamp é **relativo ao início da sessão**. A PWA mostra o horário do celular em que a sessão começou; some `ms / 1000` segundos a esse horário para datar leituras específicas.
 - Em modo 1 Hz, o intervalo entre linhas é ~1000 ms. Em modo 5 Hz, ~200 ms. A transição é visível no espaçamento dos timestamps.
 - O sensor está configurado em **modo gauge** — em pressão atmosférica a leitura fica próxima de 0 (com pequeno ruído residual de ~±0,1 bar, dentro da precisão do sensor).
+- A anotação fica atrelada à **próxima amostra após o toque** no botão "Marcar momento", então pode haver até 1 segundo de defasagem em modo 1 Hz.
 
 ---
 
@@ -246,7 +280,7 @@ Não há botão de reset acessível externamente. Para forçar reinicialização
 | **Memória de log** | ~1,5 MB (LittleFS na flash interna) |
 | **Taxa de amostragem** | 1 Hz padrão, 5 Hz adaptativo (ΔP > 0,2 bar) |
 | **Duração máxima de sessão** | 2 horas |
-| **Formato de saída** | CSV (ms;bar) |
+| **Formato de saída** | CSV (`ms;bar;degC;note`) |
 | **Identificador BLE** | `LoggerP_C3` |
 | **SSID Wi-Fi para download** | `LoggerP_AP` (rede aberta) |
 | **PWA** | https://marcelobatistabhz.github.io/SCPT-Sensor-de-Concreto-na-Ponta-do-Trado/ |
@@ -269,10 +303,22 @@ Se a PWA estiver indisponível ou para depuração, o equipamento pode ser opera
 |---|---|
 | `START` | Inicia coleta (apaga log anterior) |
 | `STOP` | Para coleta |
+| `TARE` | Calibra offset do sensor (em IDLE ou READY) |
 | `READ` | Inicia transferência do CSV pela char Data |
+| `NOTE n` | Anotação na timeline (n=1..5, só em COLLECT). Texto vai pra coluna `note` da próxima amostra. |
 | `DOWNLOAD` | Liga AP Wi-Fi |
 | `STOPWIFI` | Desliga AP Wi-Fi |
 | `ERASE` | Apaga log atual |
+
+**Tabela de `NOTE n`:**
+
+| `n` | Texto gravado |
+|---|---|
+| `1` | `inicio perfuracao` |
+| `2` | `fim perfuracao` |
+| `3` | `inicio concretagem` |
+| `4` | `fim concretagem` |
+| `5` | `outra` |
 
 **Formato do status** (lido/notificado pela char Status):
 
@@ -288,4 +334,4 @@ WIFI 192.168.4.1 b=3895
 
 ---
 
-*Última revisão: 2026-05-10*
+*Última revisão: 2026-05-11*

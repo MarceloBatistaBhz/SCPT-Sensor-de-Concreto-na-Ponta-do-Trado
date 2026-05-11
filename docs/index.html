@@ -196,6 +196,12 @@
     .btn-warning   { background: #ffd43b; color: #1a1a1a; }
     .btn-danger    { background: #ff6b6b; }
     .btn-secondary { background: #495057; }
+    .btn-mark      { background: #ffa94d; color: #1a1a1a; }
+    /* Botoes dentro do modal de selecao de nota: dois grupos
+       (perfuracao em azul, concretagem em verde, outra cinza). */
+    .btn-note-perf  { background: #4dabf7; color: #1a1a1a; }
+    .btn-note-concr { background: #51cf66; color: #1a1a1a; }
+    .btn-note-other { background: #adb5bd; color: #1a1a1a; }
     .btn-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -376,6 +382,32 @@
       line-height: 1;
     }
     .modal-check.visible { opacity: 1; }
+    /* Modal de selecao de nota (botoes empilhados verticalmente) */
+    .modal-card-wide {
+      width: min(92%, 360px);
+      text-align: left;
+    }
+    .modal-note-time {
+      font-size: 0.82rem;
+      color: #adb5bd;
+      margin-bottom: 0.9rem;
+      font-family: ui-monospace, "Consolas", monospace;
+      text-align: center;
+    }
+    .note-options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+    .note-options .btn {
+      padding: 0.85rem 1rem;
+      font-size: 1rem;
+    }
+    .modal-note-cancel {
+      margin-top: 0.9rem;
+      padding: 0.7rem;
+      font-size: 0.95rem;
+    }
     details {
       background: #2a2a2a;
       border-radius: 8px;
@@ -504,6 +536,8 @@
     <button class="btn btn-warning" id="btnStop"   disabled>Parar coleta</button>
   </div>
 
+  <button class="btn btn-mark" id="btnMarkMoment" hidden>Marcar momento</button>
+
   <button class="btn btn-primary" id="btnDownloadBle" disabled>Baixar e compartilhar</button>
 
   <div class="progress" id="progressBox" hidden>
@@ -547,9 +581,24 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v15 &middot; animacoes mais perceptiveis + modal calibracao &middot; Chrome/Edge no Android</p>
+  <p class="footer">v16 &middot; anotacoes na timeline &middot; Chrome/Edge no Android</p>
 
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
+
+  <div class="modal-overlay" id="noteModal" hidden>
+    <div class="modal-card modal-card-wide">
+      <div class="modal-title">Marcar momento</div>
+      <div class="modal-note-time" id="noteModalTime">--</div>
+      <div class="note-options">
+        <button class="btn btn-note-perf"  data-note="1">Inicio perfuracao</button>
+        <button class="btn btn-note-perf"  data-note="2">Fim perfuracao</button>
+        <button class="btn btn-note-concr" data-note="3">Inicio concretagem</button>
+        <button class="btn btn-note-concr" data-note="4">Fim concretagem</button>
+        <button class="btn btn-note-other" data-note="5">Outra situacao</button>
+      </div>
+      <button class="btn btn-secondary modal-note-cancel" id="btnNoteCancel">Cancelar</button>
+    </div>
+  </div>
 
   <div class="modal-overlay" id="tareModal" hidden>
     <div class="modal-card">
@@ -664,6 +713,57 @@
 
     // Tracking de bateria pra avisar so na transicao 20% -> abaixo
     let lastBatteryPct = null;
+
+    // === Anotacoes na timeline ===
+    // Tabela fixa: tag (1..5) -> texto. Tem que bater com noteTextFromTag()
+    // no firmware (.ino). Sem acentos pra evitar UTF-8 multibyte no CSV.
+    const NOTE_LABELS = {
+      '1': 'inicio perfuracao',
+      '2': 'fim perfuracao',
+      '3': 'inicio concretagem',
+      '4': 'fim concretagem',
+      '5': 'outra',
+    };
+    // Cor por categoria (usada nas linhas tracejadas do grafico)
+    function noteColor(text) {
+      if (text.indexOf('perfuracao')  >= 0) return '#4dabf7';  // azul
+      if (text.indexOf('concretagem') >= 0) return '#51cf66';  // verde
+      return '#adb5bd';                                          // cinza
+    }
+
+    let collStartedMs = null;   // millis quando a PWA viu COLL pela 1a vez
+
+    function openNoteModal() {
+      if (!cmdChar) { showToast('Nao conectado', 'error', 2000); return; }
+      const modal = $('noteModal');
+      // Calcula quanto tempo decorrido na coleta (so display, sem persistir)
+      if (collStartedMs) {
+        const dt = Math.floor((Date.now() - collStartedMs) / 1000);
+        const m = Math.floor(dt / 60);
+        const s = dt % 60;
+        $('noteModalTime').textContent =
+          'em ' + m + 'm' + String(s).padStart(2, '0') + 's da sessao';
+      } else {
+        $('noteModalTime').textContent = '';
+      }
+      modal.classList.remove('closing');
+      modal.hidden = false;
+    }
+    function closeNoteModal() {
+      const modal = $('noteModal');
+      modal.classList.add('closing');
+      setTimeout(() => {
+        modal.hidden = true;
+        modal.classList.remove('closing');
+      }, 500);
+    }
+    function pickNote(tag) {
+      const label = NOTE_LABELS[tag];
+      if (!label) return;
+      sendCmd('NOTE ' + tag);
+      showToast('Marcado: ' + label, 'success', 2200);
+      closeNoteModal();
+    }
 
     function formatHMS(seconds) {
       const h = Math.floor(seconds / 3600);
@@ -841,6 +941,11 @@
       }
       // Botao big-mode so faz sentido quando ha live data
       $('btnBigMode').hidden = !hasLive;
+      // Botao "Marcar momento" visivel apenas durante COLL e conectado
+      $('btnMarkMoment').hidden = !(isColl && !!cmdChar);
+      // Anchor de tempo da coleta — usado so pro display do modal de nota
+      if (isColl && !wasColl) collStartedMs = Date.now();
+      if (!isColl)             collStartedMs = null;
 
       // Countdown so durante COLL com r= valido
       if (remainingS !== null && visibleText.startsWith('COLL')) {
@@ -1074,6 +1179,7 @@
       const text = new TextDecoder().decode(bytes);
       const lines = text.split('\n');
       const points = [];   // [ms, bar, degC] — degC pode ser NaN se CSV antigo
+      const notes  = [];   // [{ms, text}] da 4a coluna, se presente
       let hasTemp = false;
       for (let i = 1; i < lines.length; i++) {  // pula header
         const line = lines[i].trim();
@@ -1086,6 +1192,11 @@
         const degC = (parts.length >= 3) ? parseFloat(parts[2]) : NaN;
         if (isFinite(degC)) hasTemp = true;
         points.push([ms, bar, degC]);
+        // 4a coluna: nota (se presente e nao vazia)
+        if (parts.length >= 4) {
+          const note = parts[3].trim();
+          if (note) notes.push({ ms: ms, text: note });
+        }
       }
       if (points.length < 2) return null;
 
@@ -1147,6 +1258,7 @@
         tFinal,
         tAxisMin,
         tAxisMax,
+        notes,
       };
     }
 
@@ -1170,11 +1282,19 @@
       requestAnimationFrame(() => { chartRafPend = false; drawChart(); });
     }
 
+    // Escapa caracteres especiais de XML pra inserir texto cru em SVG
+    function escapeXml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'
+      }[c]));
+    }
+
     function drawChart() {
       if (!chartData || !chartView) return;
       const { points, ma, pMax, pMaxIdx, pMin, pMean, pMedian, pStd,
               tMin, tMax,
-              hasTemp, tInit, tFinal, tAxisMin, tAxisMax } = chartData;
+              hasTemp, tInit, tFinal, tAxisMin, tAxisMax,
+              notes } = chartData;
       const { xMin, xMax } = chartView;
       const duration = Math.max(1, xMax - xMin);
       const yScale = Math.max(pMax, 0.1);
@@ -1243,6 +1363,29 @@
         }
       }
 
+      // Marcadores de anotacao (linhas verticais tracejadas + label),
+      // filtrados pra janela visivel. Texto rotacionado 90 graus pra caber
+      // verticalmente entre as linhas; cor varia por categoria.
+      let noteMarks = '';
+      if (notes && notes.length) {
+        for (const note of notes) {
+          if (note.ms < xMin || note.ms > xMax) continue;
+          const xN = xPx(note.ms);
+          const color = noteColor(note.text);
+          const txt = escapeXml(note.text);
+          noteMarks +=
+            '<line x1="' + xN.toFixed(1) + '" x2="' + xN.toFixed(1) + '" ' +
+              'y1="' + CHART_PAD_T + '" y2="' + (CHART_H - CHART_PAD_B) +
+              '" stroke="' + color + '" stroke-width="1" ' +
+              'stroke-dasharray="3 3" opacity="0.85"/>' +
+            '<text x="' + (xN + 3).toFixed(1) + '" ' +
+              'y="' + (CHART_PAD_T + 4) + '" ' +
+              'fill="' + color + '" class="cnote" ' +
+              'transform="rotate(90 ' + (xN + 3).toFixed(1) + ',' +
+              (CHART_PAD_T + 4) + ')">' + txt + '</text>';
+        }
+      }
+
       // Marcador de pico (so se estiver na janela visivel)
       let peakMark = '';
       const peakMs = points[pMaxIdx][0];
@@ -1273,6 +1416,7 @@
             '.ctemp{stroke:#dee2e6;stroke-width:1.2;fill:none;stroke-linejoin:round;opacity:0.85}' +
             '.cdot{fill:#ff6b6b;stroke:#1a1a1a;stroke-width:1}' +
             '.cpklbl{fill:#ff6b6b;font-size:10px;font-family:ui-monospace,Consolas,monospace}' +
+            '.cnote{font-size:9px;font-family:ui-monospace,Consolas,monospace;text-anchor:start;font-weight:600}' +
           '</style>' +
           gridH.join('') + gridV.join('') +
           '<line x1="' + CHART_PAD_L + '" y1="' + CHART_PAD_T + '" x2="' + CHART_PAD_L +
@@ -1285,6 +1429,7 @@
           '<path d="' + d + '" class="cline"/>' +
           '<path d="' + dMa + '" class="cma"/>' +
           peakMark +
+          noteMarks +
         '</svg>';
 
       $('chartSvg').innerHTML = svg;
@@ -1300,9 +1445,13 @@
         legend += ' &nbsp; <span class="lg-line lg-gray"></span> temperatura';
       }
 
-      // Linha 1: resumo da janela inteira
+      // Linha 1: resumo da janela inteira (+ contagem de anotacoes, se houver)
+      const noteCountLbl = (notes && notes.length)
+        ? ' | ' + notes.length + (notes.length === 1 ? ' anotacao' : ' anotacoes')
+        : '';
       const line1 = points.length + ' amostras | pico ' + pMax.toFixed(2) + ' bar @ ' +
-        formatTime(peakS) + ' | duracao ' + formatTime(fullRange / 1000) + zoomLabel;
+        formatTime(peakS) + ' | duracao ' + formatTime(fullRange / 1000) +
+        noteCountLbl + zoomLabel;
       // Linha 2: estatisticas da pressao
       const line2 = 'media ' + pMean.toFixed(2) + ' &middot; mediana ' + pMedian.toFixed(2) +
         ' &middot; &sigma; ' + pStd.toFixed(2) +
@@ -1638,6 +1787,16 @@
     };
     $('btnOpenCsv').onclick   = () => window.open(CSV_URL, '_blank', 'noopener');
     $('btnBigMode').onclick   = toggleBigMode;
+    $('btnMarkMoment').onclick = openNoteModal;
+    $('btnNoteCancel').onclick = closeNoteModal;
+    // Cada botao de opcao no modal manda o tag correspondente
+    document.querySelectorAll('#noteModal .note-options .btn').forEach((b) => {
+      b.onclick = () => pickNote(b.getAttribute('data-note'));
+    });
+    // Fecha o modal ao tocar fora do card
+    $('noteModal').addEventListener('click', (e) => {
+      if (e.target === $('noteModal')) closeNoteModal();
+    });
 
     // Aplica preferencia salva ao carregar
     applyBigMode();

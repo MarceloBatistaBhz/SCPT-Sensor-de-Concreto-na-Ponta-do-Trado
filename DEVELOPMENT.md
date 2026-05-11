@@ -223,12 +223,28 @@ Tudo da PWA está em `docs/`:
 |---|---|---|
 | `START` | IDLE, READY | Apaga `/log.csv`, inicia sessão, reseta contadores |
 | `STOP` | COLLECT | Fecha arquivo, transiciona pra READY |
+| `TARE` | IDLE, READY | Coleta 16 amostras em ~1.3 s, usa a média como offset |
 | `READ` | READY (com log existente) | Inicia streaming do `/log.csv` via char `data` |
+| `NOTE n` | COLLECT | Pendura nota fixa (n=1..5) na próxima amostra do CSV |
 | `DOWNLOAD` | IDLE, READY | Sobe AP Wi-Fi |
 | `STOPWIFI` | SERVING | Derruba AP manualmente |
 | `ERASE` | qualquer | Apaga `/log.csv`, transiciona pra IDLE |
 
 Comandos inválidos no estado atual são silenciosamente ignorados (apenas logados via Serial).
+
+**Tabela de `NOTE n` → texto que entra na 4ª coluna do CSV:**
+
+| `n` | Texto |
+|---|---|
+| `1` | `inicio perfuracao` |
+| `2` | `fim perfuracao` |
+| `3` | `inicio concretagem` |
+| `4` | `fim concretagem` |
+| `5` | `outra` |
+
+Lista fechada — operador escolhe na PWA (botões coloridos), evita digitação em campo. Sem acentos, pra evitar bytes UTF-8 multibyte indo pro arquivo. A tabela está duplicada em dois lugares: `noteTextFromTag()` no firmware e `NOTE_LABELS` em `docs/index.html`. **Mantenha sincronizadas.**
+
+A nota fica em `pendingNote` (RAM) e é gravada **na próxima amostra** (piggyback), depois zera. Atraso: ≤1 s em 1 Hz, ≤200 ms em 5 Hz. Se BLE cair entre o comando e a próxima amostra, a nota é perdida — trade-off em troca de simplicidade (nada persistido em flash).
 
 ### 5.3 Formato do `status` (notify)
 
@@ -402,6 +418,8 @@ Editar `appendLog()` em `MedidorSinalBLE.ino`. Se mudar separador ou colunas:
 - Atualizar o parser `parseCsvBytes()` na PWA.
 - Bumpar versão da PWA.
 
+**Formato atual:** `ms;bar;degC;note` — 4ª coluna fica vazia em quase todas as amostras; só preenchida quando o comando `NOTE n` foi recebido pouco antes (ver 5.2). Parser da PWA é tolerante a CSV antigo de 3 colunas (ignora coluna ausente).
+
 ### Adicionar segundo sensor (ex.: temperatura)
 
 O Keller PA9LD já lê temperatura junto com pressão (`readPressure()` ignora os bytes T_hi/T_lo). Para gravar:
@@ -472,9 +490,10 @@ esp_pm_configure(&pm);
 
 Renderização inline em SVG (sem biblioteca externa). Componentes:
 
-- **`parseCsvBytes(bytes)`**: parser do CSV → `{points, ma, pMax, pMaxIdx, tMin, tMax}`.
+- **`parseCsvBytes(bytes)`**: parser do CSV → `{points, ma, pMax, pMaxIdx, pMin, pMean, pMedian, pStd, tMin, tMax, hasTemp, tInit, tFinal, tAxisMin, tAxisMax, notes}`. Tolerante a CSV de 3 colunas (sem temp) e de 3 ou 4 colunas (sem nota).
 - **`computeMA(points, window)`**: média móvel com janela crescente nas primeiras 49 amostras.
-- **`drawChart()`**: SVG com grid, axes, linha azul, linha laranja (MA), bolinha vermelha do pico, labels.
+- **`drawChart()`**: SVG com grid, axes, linha azul (pressão), linha laranja (MA), linha cinza (temperatura), bolinha vermelha do pico, labels, e marcadores verticais de anotação (linha tracejada + label rotacionado 90°, cor por categoria: azul=perfuração, verde=concretagem, cinza=outra). Marcadores respeitam pan/zoom.
+- Estatísticas (média, mediana, σ, min, max, pico@tempo, ΔT) e contagem de anotações renderizadas no `chartInfo` abaixo do header.
 
 ### 13.5 Pinch zoom
 
@@ -553,4 +572,4 @@ stateDiagram-v2
 
 ---
 
-*Última revisão: 2026-05-10*
+*Última revisão: 2026-05-11*
