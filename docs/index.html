@@ -214,6 +214,13 @@
       grid-template-columns: 1fr 1fr;
       gap: 0.75rem;
     }
+    /* Colunas so pros botoes visiveis: sem o "Baixar de novo",
+       o Compartilhar ocupa a largura toda */
+    .btn-row-share {
+      grid-template-columns: none;
+      grid-auto-flow: column;
+      grid-auto-columns: 1fr;
+    }
     .hint {
       background: #2a2a2a;
       border-radius: 8px;
@@ -543,9 +550,14 @@
     <button class="btn btn-warning" id="btnStop"   disabled>Parar coleta</button>
   </div>
 
-  <button class="btn btn-mark" id="btnMarkMoment" hidden>Marcar momento</button>
+  <button class="btn btn-mark" id="btnMarkMoment" hidden>Marcar Evento</button>
 
-  <button class="btn btn-primary" id="btnDownloadBle" disabled>Baixar e compartilhar</button>
+  <!-- O log baixa sozinho ao parar a coleta (ou ao conectar com coleta
+       encerrada). "Baixar de novo" so aparece se o download falhar. -->
+  <div class="btn-row btn-row-share">
+    <button class="btn btn-primary" id="btnDownloadBle" hidden>Baixar de novo</button>
+    <button class="btn btn-primary" id="btnShare" disabled>Compartilhar</button>
+  </div>
 
   <div class="progress" id="progressBox" hidden>
     <div class="progress-label">
@@ -588,13 +600,13 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v19 &middot; titulo SCPT em 2 linhas &middot; Chrome/Edge no Android</p>
+  <p class="footer">v20 &middot; download automatico + Marcar Evento &middot; Chrome/Edge no Android</p>
 
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
   <div class="modal-overlay" id="noteModal" hidden>
     <div class="modal-card modal-card-wide">
-      <div class="modal-title">Marcar momento</div>
+      <div class="modal-title">Marcar Evento</div>
       <div class="modal-note-time" id="noteModalTime">--</div>
       <div class="note-options">
         <button class="btn btn-note-perf"  data-note="1">Inicio perfuracao</button>
@@ -644,6 +656,12 @@
     let streamReceived  = 0;
     let streamChunks    = [];
     let streamWatchdog  = null;
+
+    // Log da ultima coleta ja baixado no celular (alimenta grafico e Compartilhar)
+    let localLog          = null;   // { bytes, blob, file, fname, n }
+    let downloadInFlight  = false;  // READ enviado e download ainda nao terminou
+    let downloadFailed    = false;  // ultimo download falhou -> "Baixar de novo"
+    let autoDownloadArmed = false;  // proximo estado READY dispara o download sozinho
 
     // Chart geometry (hoisted pra ser usado em renderChart e nos handlers de touch)
     const CHART_W      = 360;
@@ -934,6 +952,11 @@
       if (!isColl && wasColl) clearLiveSamples();
       lastSeenState = visibleText;
 
+      // Coleta nova: grafico e log da coleta anterior saem da tela.
+      // Coleta encerrada com o app olhando (Parar ou auto-stop): baixa sozinho.
+      if (isColl && !wasColl) clearSessionLog();
+      if (wasColl && visibleText.startsWith('READY')) autoDownloadArmed = true;
+
       // Live values + sparkline durante COLL
       const hasLive = isColl && livePres !== null && liveTemp !== null;
       if (hasLive) {
@@ -948,7 +971,7 @@
       }
       // Botao big-mode so faz sentido quando ha live data
       $('btnBigMode').hidden = !hasLive;
-      // Botao "Marcar momento" visivel apenas durante COLL e conectado
+      // Botao "Marcar Evento" visivel apenas durante COLL e conectado
       $('btnMarkMoment').hidden = !(isColl && !!cmdChar);
       // Anchor de tempo da coleta — usado so pro display do modal de nota
       if (isColl && !wasColl) collStartedMs = Date.now();
@@ -995,22 +1018,64 @@
         setTimeout(() => card.classList.remove('coll-enter'), 2000);
       }
 
-      const isIdle    = (visibleText === 'IDLE');
-      const isCollect = visibleText.startsWith('COLL');
-      const isReady   = visibleText.startsWith('READY');
-      const isServing = visibleText.startsWith('WIFI');
-      const connected = !!cmdChar;
-      const isStreaming = streamTotal > 0;
+      updateActionButtons();
+      maybeAutoDownload();
+    }
 
-      $('btnStart').disabled       = !connected || !(isIdle || isReady) || isStreaming;
+    // Habilita/esconde os botoes de acao a partir do ultimo estado visto
+    // e do log baixado. Chamada tambem quando o download muda de fase.
+    function updateActionButtons() {
+      const st        = lastSeenState;
+      const isIdle    = (st === 'IDLE');
+      const isCollect = st.startsWith('COLL');
+      const isReady   = st.startsWith('READY');
+      const isServing = st.startsWith('WIFI');
+      const connected = !!cmdChar;
+      const busy      = downloadInFlight || streamTotal > 0;
+
+      $('btnStart').disabled       = !connected || !(isIdle || isReady) || busy;
       $('btnStop').disabled        = !connected || !isCollect;
-      $('btnDownloadBle').disabled = !connected || !isReady || isStreaming;
-      $('btnDownload').disabled    = !connected || !(isIdle || isReady) || isStreaming;
+      $('btnDownload').disabled    = !connected || !(isIdle || isReady) || busy;
       $('btnStopWifi').disabled    = !connected || !isServing;
-      $('btnErase').disabled       = !connected || !(isIdle || isReady) || isStreaming;
+      $('btnErase').disabled       = !connected || !(isIdle || isReady) || busy;
+
+      $('btnDownloadBle').hidden   = !(downloadFailed && isReady && connected);
+      $('btnDownloadBle').disabled = busy;
+      $('btnShare').disabled       = !localLog || busy;
 
       $('btnOpenCsv').hidden = !isServing;
       $('wifiHint').hidden   = !isServing;
+    }
+
+    // Contador de amostras do status ("READY n=14400") — identifica a coleta
+    function readyCount(st) {
+      const m = st.match(/n=(\d+)/);
+      return m ? parseInt(m[1], 10) : null;
+    }
+
+    // Download automatico: consome o gatilho no 1o estado visto conectado.
+    // So baixa se o logger estiver em READY e o celular ainda nao tiver esse log.
+    function maybeAutoDownload() {
+      if (!autoDownloadArmed || !cmdChar) return;
+      autoDownloadArmed = false;
+      const st = lastSeenState;
+      if (!st.startsWith('READY') || downloadInFlight) return;
+      if (localLog && localLog.n === readyCount(st)) return;
+      // Log do celular e de outra coleta: sai da tela antes de baixar o novo,
+      // pra nao compartilhar o arquivo errado se o download falhar
+      if (localLog) clearSessionLog();
+      logLine('Baixando o log automaticamente...');
+      startBleDownload();
+    }
+
+    // Coleta nova: some com o grafico e o log baixado da coleta anterior
+    function clearSessionLog() {
+      hideChart();
+      chartData      = null;
+      chartView      = null;
+      localLog       = null;
+      downloadFailed = false;
+      updateActionButtons();
     }
 
     async function sendCmd(cmd) {
@@ -1044,14 +1109,21 @@
       statChar = await svc.getCharacteristic(STAT_UUID);
       dataChar = await svc.getCharacteristic(DATA_UUID);
 
-      statChar.addEventListener('characteristicvaluechanged', (e) => {
+      // Atribuicao (e nao addEventListener): se o bind rodar 2x na mesma
+      // conexao, o handler e trocado em vez de duplicado. Handler duplicado
+      // processava cada chunk do download 2x ("Header de stream invalido").
+      statChar.oncharacteristicvaluechanged = (e) => {
         const text = new TextDecoder().decode(e.target.value);
         applyState(text);
-      });
+      };
       await statChar.startNotifications();
 
-      dataChar.addEventListener('characteristicvaluechanged', onDataChunk);
+      dataChar.oncharacteristicvaluechanged = onDataChunk;
       await dataChar.startNotifications();
+
+      // Conectou com coleta encerrada que o celular ainda nao tem: baixa
+      // sozinho. Armado so aqui, com o canal de dados ja escutando.
+      autoDownloadArmed = true;
 
       const initial = await statChar.readValue();
       applyState(new TextDecoder().decode(initial));
@@ -1080,18 +1152,12 @@
       const chunk = new Uint8Array(e.target.value.buffer.slice(0));
       // Reinicia watchdog a cada chunk
       if (streamWatchdog) clearTimeout(streamWatchdog);
-      streamWatchdog = setTimeout(() => {
-        logLine('Timeout no streaming, abortando.', 'err');
-        showToast('Timeout no download', 'error');
-        resetStream();
-      }, STREAM_TIMEOUT_MS);
+      streamWatchdog = setTimeout(() => failDownload('Timeout no download'), STREAM_TIMEOUT_MS);
 
       if (streamTotal === 0) {
         // Primeiro chunk = header de 4 bytes com tamanho total
         if (chunk.length !== 4) {
-          logLine('Header de stream invalido (' + chunk.length + ' bytes)', 'err');
-          showToast('Header de stream invalido', 'error');
-          resetStream();
+          failDownload('Header de stream invalido (' + chunk.length + ' bytes)');
           return;
         }
         streamTotal = chunk[0] | (chunk[1] << 8) | (chunk[2] << 16) | (chunk[3] << 24);
@@ -1101,6 +1167,8 @@
           logLine('Log esta vazio.', 'err');
           showToast('Log esta vazio', 'warning');
           resetStream();
+          downloadInFlight = false;
+          updateActionButtons();
           return;
         }
         logLine('Recebendo ' + streamTotal + ' bytes via BLE...');
@@ -1117,7 +1185,18 @@
       }
     }
 
-    async function finishStream() {
+    // Download falhou (sem resposta, timeout, header ruim ou conexao caiu):
+    // aparece o botao "Baixar de novo".
+    function failDownload(msg) {
+      logLine(msg + ', abortando.', 'err');
+      showToast(msg, 'error');
+      resetStream();
+      downloadInFlight = false;
+      downloadFailed   = true;
+      updateActionButtons();
+    }
+
+    function finishStream() {
       // Junta os chunks
       const total = new Uint8Array(streamReceived);
       let off = 0;
@@ -1133,13 +1212,22 @@
       const file = new File([blob], fname, { type: 'text/csv' });
 
       logLine('Transferencia completa (' + streamReceived + ' bytes).', 'ok');
-      showToast('Download completo (' + (streamReceived / 1024).toFixed(1) + ' KB)', 'success');
+      showToast('Log baixado (' + (streamReceived / 1024).toFixed(1) + ' KB)', 'success');
 
-      // Renderiza grafico antes do share, pra que ja esteja na tela
-      // quando o usuario voltar do share sheet.
+      // Guarda o log pro botao Compartilhar; n identifica a coleta
+      localLog = { bytes: total, blob, file, fname, n: readyCount(lastSeenState) };
+      downloadInFlight = false;
+      downloadFailed   = false;
       renderChart(total);
       resetStream();
+      updateActionButtons();
+    }
 
+    // Compartilha o log ja baixado. Chamado direto pelo toque no botao:
+    // o Chrome so abre o menu de compartilhar logo apos um gesto do usuario.
+    async function shareLocalLog() {
+      if (!localLog) return;
+      const { blob, file, fname } = localLog;
       // Tenta share nativo (Android: WhatsApp aparece no share sheet)
       const canShareFile = navigator.canShare && navigator.canShare({ files: [file] });
       if (navigator.share && canShareFile) {
@@ -1626,16 +1714,14 @@
 
     function startBleDownload() {
       if (!dataChar) { logLine('Stream nao disponivel', 'err'); return; }
-      if (streamTotal > 0) { logLine('Streaming ja em andamento', 'err'); return; }
+      if (downloadInFlight || streamTotal > 0) { logLine('Download ja em andamento', 'err'); return; }
       resetStream();
+      downloadInFlight = true;
+      updateActionButtons();
       showProgress(0);
       sendCmd('READ');
       // Watchdog inicial — se o header nao chegar em 5s, aborta
-      streamWatchdog = setTimeout(() => {
-        logLine('Sem resposta do logger, abortando.', 'err');
-        showToast('Sem resposta do logger', 'error');
-        resetStream();
-      }, 5000);
+      streamWatchdog = setTimeout(() => failDownload('Sem resposta do logger'), 5000);
     }
 
     function setConnectedUi() {
@@ -1675,8 +1761,14 @@
       }
     }
 
+    // Uma tentativa por vez: com o logger fora do ar, gatt.connect() fica
+    // pendente por mais que o intervalo de 4 s. Sem a trava, as tentativas
+    // acumuladas terminavam juntas quando o logger voltava e o bind rodava
+    // varias vezes na mesma conexao.
+    let reconnectInFlight = false;
     async function tryReconnect() {
-      if (!device || !reconnecting) return;
+      if (!device || !reconnecting || reconnectInFlight) return;
+      reconnectInFlight = true;
       try {
         const server = await device.gatt.connect();
         await bindCharacteristics(server);
@@ -1687,6 +1779,8 @@
       } catch (e) {
         logLine('Tentativa falhou: ' + e.message, 'err');
         // continua tentando no proximo tick do interval
+      } finally {
+        reconnectInFlight = false;
       }
     }
 
@@ -1721,6 +1815,9 @@
       cmdChar  = null;
       statChar = null;
       dataChar = null;
+      // Caiu no meio do download: conta como falha. Ao reconectar em READY
+      // o download automatico tenta de novo.
+      if (downloadInFlight) { downloadInFlight = false; downloadFailed = true; }
       resetStream();
       // Se ainda temos referencia ao device, entra em modo reconexao automatica
       if (device) {
@@ -1746,6 +1843,7 @@
     async function performTareAndStart() {
       if (tareInProgress) return;
       tareInProgress = true;
+      clearSessionLog();   // grafico da coleta anterior sai ja no toque
 
       const modal = $('tareModal');
       const fill  = $('tareProgress');
@@ -1783,6 +1881,7 @@
     $('btnStart').onclick       = performTareAndStart;
     $('btnStop').onclick        = () => sendCmd('STOP');
     $('btnDownloadBle').onclick = startBleDownload;
+    $('btnShare').onclick       = shareLocalLog;
     $('btnCloseChart').onclick  = hideChart;
     $('btnDownload').onclick    = () => sendCmd('DOWNLOAD');
     $('btnStopWifi').onclick    = () => sendCmd('STOPWIFI');
