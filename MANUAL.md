@@ -1,7 +1,7 @@
 # Manual de Operação — Datalogger de Pressão Hidráulica
 
-**Modelo:** LoggerP_C3
-**Hardware:** ESP32-C3 (Seeed XIAO) + sensor Keller PA9LD-50bar
+**Modelo:** LoggerP_C3\
+**Hardware:** ESP32-C3 (Seeed XIAO) + sensor Keller PA9LD-50bar\
 **Bateria:** LiPo 3,7 V 250 mAh recarregável
 
 ---
@@ -62,24 +62,22 @@ Para confirmar que está ligado: abra a PWA, toque em **"Conectar via Bluetooth"
 
 ## 6. Interface da PWA
 
-```
-┌─────────────────────────────────────────┐
-│ Logger Pressao SCPT                     │
-├─────────────────────────────────────────┤
-│ ESTADO                  [▮▮▮▮▮▯▯] 78% · 4.02V │  ← Indicador bateria
-│ COLL 1Hz n=42                           │  ← Estado atual
-│ Iniciada as 14:32:01                    │  ← Hora do celular
-│ Auto-stop em 1:59:18                    │  ← Countdown 2h
-├─────────────────────────────────────────┤
-│ [ Conectado: LoggerP_C3 ]               │
-├─────────────────────────────────────────┤
-│ [ Iniciar coleta ]  [ Parar coleta ]    │
-├─────────────────────────────────────────┤
-│ [ Baixar e compartilhar ]               │
-├─────────────────────────────────────────┤
-│ [Avancado] ▼                            │
-└─────────────────────────────────────────┘
-```
+![Tela da PWA durante uma coleta](img/pwa-coleta.png)
+
+**Card "Estado"** (de cima para baixo):
+- **Bateria**, no canto superior direito: percentual e tensão. Ao lado fica o botão de **números grandes**, que alterna para uma visão só com pressão e temperatura em fonte grande (para ler de longe).
+- **Estado e contador de amostras**: por exemplo `COLL 1Hz n=1535` (coletando a 1 Hz, 1535 leituras gravadas).
+- **Valores ao vivo**: pressão em bar (azul) e temperatura em °C.
+- **"Iniciada às HH:MM:SS"**: horário do celular em que a coleta começou.
+- **"Auto-stop em H:MM:SS"**: quanto falta para a parada automática de 2 horas.
+- **Mini-gráfico dos últimos 60 s**: azul = pressão, laranja = média, cinza = temperatura.
+
+**Abaixo do card:**
+- **Conectar via Bluetooth**: depois de conectado, mostra `Conectado: LoggerP_C3`.
+- **Iniciar coleta** (verde) e **Parar coleta** (amarelo).
+- **Marcar momento** (laranja): só aparece durante a coleta (ver 7.4).
+- **Baixar e compartilhar** (azul): baixa o `log.csv` e abre o menu de compartilhamento (ver 7.6).
+- **Avançado**: menu recolhido com as funções menos usadas (apagar log, download via Wi-Fi etc.).
 
 **Cores do card Estado:**
 - 🔵 **Azul** = Pronto (READY) — log disponível para download
