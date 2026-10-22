@@ -10,7 +10,7 @@
 
 Este equipamento registra a **pressão hidráulica** medida pelo sensor Keller, gravando os valores em um arquivo CSV na memória interna. A coleta é feita a **1 Hz** (uma leitura por segundo); sempre que a pressão variar mais de **0,2 bar** entre duas leituras consecutivas, a taxa sobe automaticamente para **5 Hz** (uma leitura a cada 200 ms) e volta a 1 Hz após 30 segundos sem variação brusca.
 
-A operação é feita pelo celular Android através de uma **PWA (Progressive Web App)** — um aplicativo web que pode ser instalado no celular como um app comum. Toda a interação (iniciar/parar coleta, baixar dados, ver gráfico) é feita pela PWA via Bluetooth.
+A operação é feita pelo celular Android através do **app SCPT** — um aplicativo que abre pelo navegador Chrome e pode ser instalado no celular como um app comum, sem precisar da Play Store. Toda a interação (iniciar/parar coleta, baixar dados, ver gráfico) é feita pelo app via Bluetooth.
 
 **O equipamento não tem botões nem LED de funcionamento.** Toda a interação é pelo celular.
 
@@ -24,19 +24,19 @@ A operação é feita pelo celular Android através de uma **PWA (Progressive We
 | Cabo USB-C | Para carregar a bateria |
 | Carregador USB | 5 V, qualquer fonte de celular padrão |
 
-**PWA disponível em:**
+**App SCPT disponível em:**
 https://marcelobatistabhz.github.io/SCPT-Sensor-de-Concreto-na-Ponta-do-Trado/
 
 ---
 
-## 3. Instalando a PWA no celular (uma vez só)
+## 3. Instalando o app SCPT no celular (uma vez só)
 
 1. No celular Android, abra o **Chrome**.
-2. Acesse o link da PWA acima.
+2. Acesse o link do app acima.
 3. Toque no menu (⋮) → **"Instalar app"** ou **"Adicionar à tela inicial"**.
-4. Confirme. O ícone do manômetro aparece no launcher.
+4. Confirme. O ícone do manômetro, com o nome **SCPT**, aparece no launcher.
 
-A partir daqui, abrir a PWA é igual a abrir qualquer app nativo. Funciona offline (exceto para receber atualizações de versão).
+A partir daqui, abrir o app SCPT é igual a abrir qualquer outro app. Funciona offline (exceto para receber atualizações de versão).
 
 ---
 
@@ -48,7 +48,7 @@ A partir daqui, abrir a PWA é igual a abrir qualquer app nativo. Funciona offli
 4. Tempo total de carga: **~1 h** com carregador de 500 mA ou maior.
 5. Você pode usar o equipamento normalmente enquanto ele estiver conectado ao carregador.
 
-> ⚠️ **Sempre verifique o nível de bateria na PWA antes de uma sessão longa.** O indicador no canto superior direito do card "Estado" mostra o percentual e a tensão.
+> ⚠️ **Sempre verifique o nível de bateria no app antes de uma sessão longa.** O indicador no canto superior direito do card "Estado" mostra o percentual e a tensão.
 
 ---
 
@@ -56,13 +56,13 @@ A partir daqui, abrir a PWA é igual a abrir qualquer app nativo. Funciona offli
 
 O equipamento liga **assim que a bateria é conectada** ou assim que o cabo USB é plugado. Não há botão de power.
 
-Para confirmar que está ligado: abra a PWA, toque em **"Conectar via Bluetooth"** e verifique se `LoggerP_C3` aparece na lista de dispositivos próximos.
+Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluetooth"** e verifique se `LoggerP_C3` aparece na lista de dispositivos próximos.
 
 ---
 
-## 6. Interface da PWA
+## 6. Tela do app SCPT
 
-![Tela da PWA durante uma coleta](img/pwa-coleta.png)
+![Tela do app SCPT durante uma coleta](img/pwa-coleta.png)
 
 **Card "Estado"** (de cima para baixo):
 - **Bateria**, no canto superior direito: percentual e tensão. Ao lado fica o botão de **números grandes**, que alterna para uma visão só com pressão e temperatura em fonte grande (para ler de longe).
@@ -97,7 +97,7 @@ Para confirmar que está ligado: abra a PWA, toque em **"Conectar via Bluetooth"
 
 ### 7.1 Conectar
 
-1. Abra a PWA no celular.
+1. Abra o app SCPT no celular.
 2. Confirme **Bluetooth ligado** e **Localização ligada** (Android exige localização ativa para scan BLE — exigência do sistema).
 3. Toque em **"Conectar via Bluetooth"**.
 4. Escolha `LoggerP_C3` na lista que aparece.
@@ -115,7 +115,7 @@ Aparecem também:
 
 A taxa alterna automaticamente entre 1 Hz (regime estável) e 5 Hz (variações rápidas). Os dados são gravados em tempo real na flash interna.
 
-**Comportamento de campo (trado descendo):** se o celular sair de alcance (equipamento desce abaixo da superfície), a conexão BLE cai e a PWA mostra "Reconectando...". O equipamento **continua coletando normalmente**. Quando voltar para perto, a PWA reconecta sozinha em até 4 s.
+**Comportamento de campo (trado descendo):** se o celular sair de alcance (equipamento desce abaixo da superfície), a conexão BLE cai e o app mostra "Reconectando...". O equipamento **continua coletando normalmente**. Quando voltar para perto, o app reconecta sozinho em até 4 s.
 
 ### 7.4 Marcar momento (anotações na timeline)
 
@@ -181,11 +181,11 @@ Se quiser apagar sem iniciar nova sessão, expanda **"Avançado"** e toque em **
 
 Caso o BLE file transfer falhe (link instável, arquivo muito grande, etc.), há fallback via Wi-Fi:
 
-1. Expanda **"Avançado"** na PWA.
+1. Expanda **"Avançado"** no app.
 2. Toque em **"Preparar download (Wi-Fi)"**. Estado muda para `WIFI 192.168.4.1`.
-3. Saia da PWA (não feche), vá em **Wi-Fi** do celular.
+3. Saia do app (não feche), vá em **Wi-Fi** do celular.
 4. Conecte na rede `LoggerP_AP` (sem senha). Aceite "manter conectado mesmo sem internet".
-5. Volte na PWA e toque em **"Abrir log.csv"**.
+5. Volte no app e toque em **"Abrir log.csv"**.
 6. O navegador baixa o arquivo. Compartilhe via menu do sistema do celular.
 
 ---
@@ -223,7 +223,7 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 
 **Observações importantes:**
 
-- O timestamp é **relativo ao início da sessão**. A PWA mostra o horário do celular em que a sessão começou; some `ms / 1000` segundos a esse horário para datar leituras específicas.
+- O timestamp é **relativo ao início da sessão**. O app mostra o horário do celular em que a sessão começou; some `ms / 1000` segundos a esse horário para datar leituras específicas.
 - Em modo 1 Hz, o intervalo entre linhas é ~1000 ms. Em modo 5 Hz, ~200 ms. A transição é visível no espaçamento dos timestamps.
 - O sensor está configurado em **modo gauge** — em pressão atmosférica a leitura fica próxima de 0 (com pequeno ruído residual de ~±0,1 bar, dentro da precisão do sensor).
 - A anotação fica atrelada à **próxima amostra após o toque** no botão "Marcar momento", então pode haver até 1 segundo de defasagem em modo 1 Hz.
@@ -249,7 +249,7 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 | Sintoma | Possível causa | O que fazer |
 |---|---|---|
 | `LoggerP_C3` não aparece ao tocar "Conectar" | Equipamento desligado, fora de alcance, ou Bluetooth/Localização desligados | Confirme bateria, aproxime do celular, ative BT e Localização |
-| Conecta mas estado fica em "Reconectando..." | Distância no limite, ou ruído | Aproxime mais. A PWA tenta reconectar automaticamente |
+| Conecta mas estado fica em "Reconectando..." | Distância no limite, ou ruído | Aproxime mais. O app tenta reconectar automaticamente |
 | Estado fica em `COLL 1Hz n=0` sem incrementar | Sensor não respondeu | Conecte ao USB, abra Serial monitor (Arduino IDE) pra ver `[AVISO]` no boot |
 | "Baixar e compartilhar" trava na barra de progresso | Link BLE instável | Aguarde 15 s — se travar, use a opção Wi-Fi (Avançado) |
 | Wi-Fi `LoggerP_AP` não aparece após DOWNLOAD | Alguns Androids escondem redes abertas | Adicionar rede manualmente no celular: `LoggerP_AP`, sem senha |
@@ -281,13 +281,13 @@ Não há botão de reset acessível externamente. Para forçar reinicialização
 | **Formato de saída** | CSV (`ms;bar;degC;note`) |
 | **Identificador BLE** | `LoggerP_C3` |
 | **SSID Wi-Fi para download** | `LoggerP_AP` (rede aberta) |
-| **PWA** | https://marcelobatistabhz.github.io/SCPT-Sensor-de-Concreto-na-Ponta-do-Trado/ |
+| **App SCPT** | https://marcelobatistabhz.github.io/SCPT-Sensor-de-Concreto-na-Ponta-do-Trado/ |
 
 ---
 
 ## 12. Operação alternativa via nRF Connect (debug)
 
-Se a PWA estiver indisponível ou para depuração, o equipamento pode ser operado pelo app **nRF Connect for Mobile** (Nordic Semiconductor, gratuito).
+Se o app SCPT estiver indisponível ou para depuração, o equipamento pode ser operado pelo app **nRF Connect for Mobile** (Nordic Semiconductor, gratuito).
 
 **UUIDs:**
 - **Serviço:** `9b78c001-c0de-4d65-a1aa-001122334455`
@@ -332,4 +332,4 @@ WIFI 192.168.4.1 b=3895
 
 ---
 
-*Última revisão: 2026-05-11*
+*Última revisão: 2026-10-22*
