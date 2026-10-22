@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#0d6efd">
-  <title>Logger Pressao SCPT</title>
+  <title>SCPT - Sensor de Concreto na Ponta do Trado</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="icon.svg">
@@ -31,6 +31,13 @@
       color: #4dabf7;
       margin-bottom: 0.25rem;
       font-weight: 600;
+    }
+    h1 .subtitle {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: #adb5bd;
+      margin-top: 0.15rem;
     }
     .status-card {
       background: #2a2a2a;
@@ -501,7 +508,7 @@
   </style>
 </head>
 <body>
-  <h1>Logger Pressao SCPT</h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado</span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
@@ -581,7 +588,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v18 &middot; nome do app SCPT &middot; Chrome/Edge no Android</p>
+  <p class="footer">v19 &middot; titulo SCPT em 2 linhas &middot; Chrome/Edge no Android</p>
 
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 

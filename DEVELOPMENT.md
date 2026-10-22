@@ -371,6 +371,8 @@ A PWA é servida pelo **GitHub Pages** a partir de `/docs` no repo. Atualizar a 
 4. `git commit && git push origin main`.
 5. GitHub Pages publica em ~30-60 s.
 
+O repositório precisa ser **público**: no plano gratuito do GitHub, tornar o repo privado desativa o Pages e o link da PWA passa a dar 404 (aconteceu entre 2026-05 e 2026-10).
+
 O service worker tem `cache: 'reload'` no install para bypassar o HTTP cache do GitHub Pages (que envia `Cache-Control: max-age=600`). Isso garante que atualizações chegam em ~1 minuto, não esperando o cache HTTP expirar.
 
 ---
@@ -399,7 +401,7 @@ O service worker tem `cache: 'reload'` no install para bypassar o HTTP cache do 
 | AP Wi-Fi sobe mas celular não conecta | Em alguns Androids, redes 100% abertas exigem confirmação manual | Adicionar rede manualmente |
 | Pressão lida está sempre próxima de zero (mas com pequenas variações) | Comportamento esperado em modo gauge (`P_MODE=0`) | Em atmosfera, ~0 ± 0,1 bar é normal |
 | Após disconnect, dispositivo "some" e exige reset | `ServerCallbacks::onDisconnect` não está reiniciando adv | Confirmar que `pServer->setCallbacks(new ServerCallbacks())` está em `setupBLE()` |
-| PWA mostra valores antigos depois de update | Service worker servindo cache obsoleto | Esperar ~1 min após push (SW updates automaticamente). Se persistir, Configurações Android → Apps → "Logger Pressao SCPT" → Limpar dados |
+| PWA mostra valores antigos depois de update | Service worker servindo cache obsoleto | Esperar ~1 min após push (SW updates automaticamente). Se persistir, Configurações Android → Apps → "SCPT - Sensor de Concreto na Ponta do Trado" → Limpar dados |
 
 ---
 
