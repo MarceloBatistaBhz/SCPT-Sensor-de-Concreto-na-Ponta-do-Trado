@@ -1,6 +1,6 @@
 {
-  "name": "Logger Pressao SCPT",
-  "short_name": "LoggerP",
+  "name": "SCPT - Sensor de Concreto na Ponta do Trado",
+  "short_name": "SCPT",
   "description": "Controle remoto via Bluetooth do datalogger de pressao SCPT",
   "start_url": "./index.html",
   "scope": "./",
