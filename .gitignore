@@ -23,3 +23,6 @@ prompts SCPT.txt
 
 # Firmware nao distribuido publicamente
 MedidorSinalBLE.ino
+
+# Saida gerada pelo pandoc (fonte: MANUAL.md)
+MANUAL.docx
