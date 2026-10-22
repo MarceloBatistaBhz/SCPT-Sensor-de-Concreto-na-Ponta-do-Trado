@@ -152,6 +152,8 @@ Calibração observada com 100k×2: erro de 0,17% (4137 mV no multímetro vs. 41
 
 > ⚠️ Versões anteriores **não compilam**: arduino-esp32 v2.x usa Bluedroid no C3 (incompatível com NimBLE), e NimBLE-Arduino v1.x tem APIs diferentes.
 
+> ⚠️ **Core 3.3.x** (testado com 3.3.10 + NimBLE-Arduino 2.5.0): o firmware precisa de `Serial.setTxTimeoutMs(0)` logo após `Serial.begin()`. Sem isso, com a placa no USB de um PC que não está lendo a serial, cada `Serial.print` espera até ~2 s — inclusive nos callbacks BLE — e a conexão e os comandos ficam lentos (ver seção 11).
+
 ### 3.2 Configurações da IDE
 
 Em `Tools`:
@@ -311,6 +313,15 @@ FAST_MAX_MS          // 1800000 (30 min cap)
 - `1Hz → 5Hz`: `ΔP > 0.2 bar` E `fastModeAccumMs < FAST_MAX_MS`
 - `5Hz → 1Hz`: `(now - lastSpikeMs) > 30 s` (decay) **OU** cap atingido
 
+### 6.1 Filtro de temperatura
+
+O Keller mede temperatura em passos de 0,05 °C e o log grava 1 casa decimal; perto de x,x5 o arredondamento pulava ±0,1 °C a cada amostra. `filterTemp()` aplica:
+
+- **Média móvel exponencial por tempo**, `TEMP_TAU_MS = 3000` (equivale à média dos últimos ~6 s, igual em 1 Hz e 5 Hz: `alpha = 1 - exp(-dt/τ)`).
+- **Histerese** `TEMP_HYST_C = 0.095`: o valor gravado só muda quando a média se afasta 0,095 °C dele; aí é arredondado para 0,1.
+
+O mesmo valor vai para o CSV e para o `t=` do status. Reinicia a cada `START`. Simulado com ruído de ±1 passo: 0 pulos com a temperatura parada em x,x5, subida em escada sem voltar, erro máx. 0,095 °C, ~8 s para acompanhar um degrau de 2 °C. A pressão não passa por filtro.
+
 ---
 
 ## 7. Resiliência a queda de energia
@@ -401,6 +412,8 @@ O service worker tem `cache: 'reload'` no install para bypassar o HTTP cache do 
 | AP Wi-Fi sobe mas celular não conecta | Em alguns Androids, redes 100% abertas exigem confirmação manual | Adicionar rede manualmente |
 | Pressão lida está sempre próxima de zero (mas com pequenas variações) | Comportamento esperado em modo gauge (`P_MODE=0`) | Em atmosfera, ~0 ± 0,1 bar é normal |
 | Após disconnect, dispositivo "some" e exige reset | `ServerCallbacks::onDisconnect` não está reiniciando adv | Confirmar que `pServer->setCallbacks(new ServerCallbacks())` está em `setupBLE()` |
+| Com a placa no USB do PC, a conexão leva ~5 s e TARE/START/READ respondem aos trancos (some ao abrir o monitor serial) | Core 3.3.x: `Serial` USB (HWCDC) espera até ~2 s por print quando o PC não lê | Manter `Serial.setTxTimeoutMs(0)` logo após `Serial.begin()` |
+| Download dá "Header de stream invalido" depois de uma reconexão | Tentativas de reconexão sobrepostas rodavam o bind várias vezes e duplicavam o handler de `data` | Manter a trava `reconnectInFlight` em `tryReconnect()` e os handlers por atribuição (`oncharacteristicvaluechanged =`) em `bindCharacteristics()` |
 | PWA mostra valores antigos depois de update | Service worker servindo cache obsoleto | Esperar ~1 min após push (SW updates automaticamente). Se persistir, Configurações Android → Apps → "SCPT - Sensor de Concreto na Ponta do Trado" → Limpar dados |
 
 ---
@@ -462,31 +475,33 @@ esp_pm_configure(&pm);
 
 1. **`requestDevice`** com filtro por nome (`LoggerP_C3`) e `optionalServices` listando o UUID do serviço.
 2. **`gatt.connect()`** abre conexão GATT.
-3. **`bindCharacteristics()`** localiza CMD, STATUS, DATA. Subscribe nas duas notify.
+3. **`bindCharacteristics()`** localiza CMD, STATUS, DATA. Subscribe nas duas notify com `oncharacteristicvaluechanged = ...` (atribuição: rodar o bind 2x troca o handler em vez de duplicar). Por último arma o download automático (ver 13.3).
 4. **Wake Lock API** mantém a tela acesa para evitar que Chrome descarte o `BluetoothDevice`.
 
 ### 13.2 Auto-reconexão
 
 `device.addEventListener('gattserverdisconnected', onDisconnected)` dispara `startReconnectLoop()`:
 
-- `setInterval` a cada 4 s tentando `device.gatt.connect()`.
+- `setInterval` a cada 4 s tentando `device.gatt.connect()`, **uma tentativa por vez** (`reconnectInFlight`): com o logger fora do ar, `connect()` fica pendente mais que 4 s.
 - Reusa o mesmo `BluetoothDevice` (não exige nova interação do usuário).
 - Card vira laranja pulsante "Reconectando".
 - Botão Conectar vira "Reconectando... (toque pra cancelar)".
 
 ### 13.3 Streaming do CSV
 
+**Quando baixa:** sozinho, ao ver `COLL → READY` (Parar coleta ou auto-stop com o app conectado) e ao conectar com o logger em `READY` numa coleta que o celular ainda não tem — `autoDownloadArmed` + `maybeAutoDownload()`, comparando o `n=` do `READY` com o do log guardado (`localLog.n`). Manualmente, pelo botão **Baixar de novo**, que só aparece depois de uma falha (`downloadFailed`). `Iniciar coleta` e a entrada em `COLL` chamam `clearSessionLog()` (some gráfico e log).
+
 `startBleDownload()`:
 
-1. Reset estado, mostra barra de progresso.
+1. Reset estado, `downloadInFlight = true`, mostra barra de progresso.
 2. Envia `READ`.
 3. Watchdog de 5 s pra primeiro chunk (header de 4 bytes).
 4. `onDataChunk` parser:
    - Primeiro chunk → `streamTotal = mv` (4 bytes LE).
    - Demais → `streamChunks.push(chunk)`, atualiza progresso.
    - Quando `streamReceived >= streamTotal` → `finishStream()`.
-5. `finishStream()` monta `Blob` + `File`, renderiza gráfico, chama `navigator.share({files})`.
-6. Watchdog de 15 s entre chunks. Se travar, aborta.
+5. `finishStream()` monta `Blob` + `File`, guarda em `localLog` e renderiza o gráfico. **Não** compartilha: o botão **Compartilhar** chama `shareLocalLog()` → `navigator.share({files})` direto no toque (o Chrome exige gesto do usuário recente; depois de um download de vários segundos o share falhava).
+6. Watchdog de 15 s entre chunks. Falha (sem resposta, timeout, header inválido, queda de conexão) → `failDownload()` → `downloadFailed = true` → aparece **Baixar de novo**.
 
 ### 13.4 Gráfico SVG
 

@@ -75,8 +75,8 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 **Abaixo do card:**
 - **Conectar via Bluetooth**: depois de conectado, mostra `Conectado: LoggerP_C3`.
 - **Iniciar coleta** (verde) e **Parar coleta** (amarelo).
-- **Marcar momento** (laranja): só aparece durante a coleta (ver 7.4).
-- **Baixar e compartilhar** (azul): baixa o `log.csv` e abre o menu de compartilhamento (ver 7.6).
+- **Marcar Evento** (laranja): só aparece durante a coleta (ver 7.4).
+- **Compartilhar** (azul): envia o log da última coleta, que o app baixa sozinho ao parar a coleta (ver 7.6). Se o download falhar, aparece ao lado o botão **Baixar de novo**.
 - **Avançado**: menu recolhido com as funções menos usadas (apagar log, download via Wi-Fi etc.).
 
 **Cores do card Estado:**
@@ -107,6 +107,8 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 Toque em **"Iniciar coleta"** (botão verde). O estado muda para `COLL 1Hz n=0` e o contador começa a subir em tempo real.
 
+> ⚠️ A nova coleta **substitui o log anterior** no equipamento, e o gráfico e o log da coleta anterior somem da tela do app. Se ainda não compartilhou a coleta anterior, faça isso antes (ver 7.6).
+
 Aparecem também:
 - **"Iniciada às HH:MM:SS"** — horário do celular em que você iniciou.
 - **"Auto-stop em H:MM:SS"** — quanto tempo falta para o auto-stop de 2 horas.
@@ -117,9 +119,9 @@ A taxa alterna automaticamente entre 1 Hz (regime estável) e 5 Hz (variações 
 
 **Comportamento de campo (trado descendo):** se o celular sair de alcance (equipamento desce abaixo da superfície), a conexão BLE cai e o app mostra "Reconectando...". O equipamento **continua coletando normalmente**. Quando voltar para perto, o app reconecta sozinho em até 4 s.
 
-### 7.4 Marcar momento (anotações na timeline)
+### 7.4 Marcar Evento (anotações na timeline)
 
-Durante a coleta, aparece o botão **"Marcar momento"** (laranja). Toque para abrir um modal com 5 opções fixas:
+Durante a coleta, aparece o botão **"Marcar Evento"** (laranja). Toque para abrir um modal com 5 opções fixas:
 
 | Opção | Cor | Quando usar |
 |---|---|---|
@@ -139,31 +141,36 @@ Toque na opção desejada → toast confirma "Marcado: ..." → o modal fecha.
 
 ### 7.5 Parar coleta
 
-Toque em **"Parar coleta"** (botão amarelo). Estado muda para `READY n=...` com a contagem total.
+Toque em **"Parar coleta"** (botão amarelo). Estado muda para `READY n=...` com a contagem total e o app **baixa o log sozinho**: a barra de progresso enche em ~3-10 segundos via Bluetooth e o gráfico aparece logo abaixo (ver 7.7).
 
 Alternativamente, a coleta para automaticamente:
 - Após **2 horas** (limite máximo de sessão).
 - Quando a bateria descarrega.
 
-### 7.6 Baixar e compartilhar (1 toque)
+Se a coleta parar sozinha com o celular conectado, o download também é automático. Se o celular estava longe ou o app foi fechado, o app baixa o log assim que conectar de novo ao equipamento.
 
-Toque em **"Baixar e compartilhar"** (botão azul).
+### 7.6 Compartilhar o log
 
-1. Barra de progresso aparece e enche em ~3-10 segundos via Bluetooth.
-2. O **menu de compartilhamento do Android** abre automaticamente.
-3. Escolha **WhatsApp**, e-mail ou qualquer app para enviar o `log.csv`.
+Depois que o log foi baixado (automático ao parar a coleta, ver 7.5), toque em **"Compartilhar"** (botão azul).
 
-O nome do arquivo já vem com data/hora: `log_2026-05-10T14-32-01.csv`.
+1. O **menu de compartilhamento do Android** abre.
+2. Escolha **WhatsApp**, e-mail ou qualquer app para enviar o `log.csv`.
+
+O nome do arquivo já vem com a data/hora do download: `log_2026-05-10_14-32-01.csv`.
+
+**Se o download falhar** (Bluetooth caiu, equipamento longe), o app avisa e aparece o botão **"Baixar de novo"** ao lado do Compartilhar. Aproxime o celular e toque nele. Se a conexão cair no meio do download, o app tenta de novo sozinho quando reconectar.
+
+O log baixado fica no app até a próxima **"Iniciar coleta"**. Se o app for fechado, ele baixa de novo do equipamento na próxima conexão.
 
 ### 7.7 Ver gráfico
 
-Após o download, o gráfico aparece automaticamente abaixo da barra de progresso. Mostra:
+Assim que o log é baixado (ao parar a coleta), o gráfico aparece abaixo dos botões. Mostra:
 
 - **Linha azul:** pressão (bar) ao longo do tempo
 - **Linha laranja:** média móvel das últimas 50 leituras (suaviza ruído, mostra tendência)
-- **Linha cinza:** temperatura (°C), eixo Y secundário à direita
+- **Linha cinza:** temperatura (°C, média dos últimos ~6 s — ver 8), eixo Y secundário à direita
 - **Bolinha vermelha:** pico de pressão da sessão, com o valor numérico
-- **Linhas verticais tracejadas coloridas:** anotações de "Marcar momento" (ver 7.4) — azul para perfuração, verde para concretagem, cinza para outras
+- **Linhas verticais tracejadas coloridas:** anotações de "Marcar Evento" (ver 7.4) — azul para perfuração, verde para concretagem, cinza para outras
 - **Info:** total de amostras, pico (com tempo), duração, contagem de anotações, média/mediana/desvio padrão da pressão, temperatura inicial→final com ΔT
 
 **Gestos no gráfico:**
@@ -173,7 +180,7 @@ Após o download, o gráfico aparece automaticamente abaixo da barra de progress
 
 ### 7.8 Apagar e iniciar nova sessão
 
-Não é necessário apagar manualmente — toque em **"Iniciar coleta"** novamente e o equipamento substitui o log anterior.
+Não é necessário apagar manualmente — toque em **"Iniciar coleta"** novamente e o equipamento substitui o log anterior. O gráfico e o log da coleta anterior também saem da tela do app.
 
 Se quiser apagar sem iniciar nova sessão, expanda **"Avançado"** e toque em **"Apagar log atual"**.
 
@@ -206,7 +213,7 @@ ms;bar;degC;note
 |---|---|
 | `ms`   | Tempo em milissegundos desde o início da sessão (`Iniciar coleta`). |
 | `bar`  | Pressão **manométrica** em bar (0 = atmosférica). 1 casa decimal. |
-| `degC` | Temperatura do sensor em °C. 1 casa decimal. |
+| `degC` | Temperatura do sensor em °C. 1 casa decimal. É a **média dos últimos ~6 s**, com um filtro que evita o vai-e-volta de ±0,1 °C; leva alguns segundos para acompanhar uma mudança brusca. |
 | `note` | Texto da anotação (ver 7.4). Vazio em quase todas as linhas. |
 
 Separador: **ponto e vírgula** (`;`). Casa decimal: **ponto** (`.`).
@@ -226,7 +233,7 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 - O timestamp é **relativo ao início da sessão**. O app mostra o horário do celular em que a sessão começou; some `ms / 1000` segundos a esse horário para datar leituras específicas.
 - Em modo 1 Hz, o intervalo entre linhas é ~1000 ms. Em modo 5 Hz, ~200 ms. A transição é visível no espaçamento dos timestamps.
 - O sensor está configurado em **modo gauge** — em pressão atmosférica a leitura fica próxima de 0 (com pequeno ruído residual de ~±0,1 bar, dentro da precisão do sensor).
-- A anotação fica atrelada à **próxima amostra após o toque** no botão "Marcar momento", então pode haver até 1 segundo de defasagem em modo 1 Hz.
+- A anotação fica atrelada à **próxima amostra após o toque** no botão "Marcar Evento", então pode haver até 1 segundo de defasagem em modo 1 Hz.
 
 ---
 
@@ -251,10 +258,10 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 | `LoggerP_C3` não aparece ao tocar "Conectar" | Equipamento desligado, fora de alcance, ou Bluetooth/Localização desligados | Confirme bateria, aproxime do celular, ative BT e Localização |
 | Conecta mas estado fica em "Reconectando..." | Distância no limite, ou ruído | Aproxime mais. O app tenta reconectar automaticamente |
 | Estado fica em `COLL 1Hz n=0` sem incrementar | Sensor não respondeu | Conecte ao USB, abra Serial monitor (Arduino IDE) pra ver `[AVISO]` no boot |
-| "Baixar e compartilhar" trava na barra de progresso | Link BLE instável | Aguarde 15 s — se travar, use a opção Wi-Fi (Avançado) |
+| Download trava na barra de progresso | Link BLE instável | Aguarde 15 s: o app avisa e mostra **"Baixar de novo"**. Aproxime o celular e toque nele; se continuar falhando, use a opção Wi-Fi (Avançado) |
 | Wi-Fi `LoggerP_AP` não aparece após DOWNLOAD | Alguns Androids escondem redes abertas | Adicionar rede manualmente no celular: `LoggerP_AP`, sem senha |
 | Indicador de bateria sumiu | Pode ser desconexão recente | Aguarde uns segundos; aparece novamente quando o status atualiza |
-| Após queda de energia, aparece `READY` no boot | Sessão anterior interrompida | Os dados gravados estão preservados. "Baixar e compartilhar" antes de novo "Iniciar coleta" |
+| Após queda de energia, aparece `READY` no boot | Sessão anterior interrompida | Os dados gravados estão preservados. Ao conectar, o app baixa o log sozinho; compartilhe antes de um novo "Iniciar coleta" |
 | Equipamento parou de gravar antes de 2 h | Bateria acabou | Recarregue. Os dados gravados estão preservados |
 
 ### Forçar reset do equipamento
