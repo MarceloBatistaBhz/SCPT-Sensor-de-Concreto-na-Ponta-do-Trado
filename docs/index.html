@@ -569,11 +569,37 @@
     .toast.error   { border-left-color: #ff6b6b; }
     .toast.warning { border-left-color: #ffd43b; }
     .toast.info    { border-left-color: #4dabf7; }
+
+    /* === Tablet (ex.: Lenovo Tab 10" em pe, ~800 x 1280 CSS px) ===
+       Mesma tela do celular, numa coluna so, mas ocupando a largura e com
+       tudo ~30% maior: quase todos os tamanhos sao em rem e crescem com a
+       fonte base; aqui so se ajustam os que sao em px. O grafico SVG ja
+       acompanha a largura. Exige altura >= 700 pra celular deitado nao
+       pegar este layout. */
+    @media (min-width: 700px) and (min-height: 700px) {
+      html { font-size: 130%; }
+      body { max-width: 900px; padding: 1.25rem 1.5rem; }
+      .btn { padding: 1.2rem; }
+      .status-live { font-size: 1.45rem; }        /* pressao/temp ao vivo: ler de longe */
+      .status-sparkline svg { height: 130px; }
+      .big-toggle { width: 42px; height: 36px; }
+      .big-toggle svg { width: 21px; height: 21px; }
+      .status-battery svg { width: 34px; height: 16px; }
+      .history-icon { width: 52px; height: 46px; }
+      .history-icon svg { width: 26px; height: 26px; }
+      .history-icon.danger { width: 44px; height: 38px; }
+      .history-icon.danger svg { width: 23px; height: 23px; }
+      .lg-line { width: 18px; height: 3px; }
+      .modal-card { width: min(86%, 420px); }
+      .modal-card-wide { width: min(92%, 470px); }
+      .toast-container { width: min(92%, 470px); }
+      .log { max-height: 240px; }
+    }
   </style>
 </head>
 <body>
   <!-- Versao do app: bumpar junto com CACHE em sw.js -->
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v27</span></span></h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v28</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
