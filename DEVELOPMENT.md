@@ -539,7 +539,7 @@ Banco `scpt-historico`, store `logs` (`keyPath: 'id'`, índice `savedAt`). Cada 
 - **Sem duplicata:** `id` = SHA-256 do conteúdo (`crypto.subtle`); baixar a mesma coleta de novo não grava outra vez.
 - **Limite:** `HISTORY_MAX = 20`; depois de gravar, apaga as chaves mais antigas pelo índice `savedAt`. 20 coletas máximas ≈ 5 MB.
 - **Persistência:** `navigator.storage.persist()` a cada gravação, para o Chrome não despejar o banco com o celular sem espaço (com o app instalado costuma ser concedido; não é garantido).
-- **UI:** `loadHistory()` na abertura do app e após cada gravação; `renderHistoryList()` monta o `<details id="historyBox">` com **Grafico** (`renderChart(bytes, 'Grafico de dd/mm hh:mm')`) e **Compartilhar** (`shareFile(bytes, fname)`). Não depende de conexão BLE.
+- **UI:** `loadHistory()` na abertura do app e após cada gravação; `renderHistoryList()` monta o `<details id="historyBox">` com **uma linha por coleta** (`dd/mm hh:mm · duração · pico bar`, `white-space: nowrap` + reticências) e dois botões de ícone SVG inline (`historyIconButton()`, `ICON_CHART`/`ICON_SHARE`, 40×36 px): gráfico → `renderChart(bytes, 'Grafico de dd/mm hh:mm')`, compartilhar → `shareFile(bytes, fname)`. A palavra "pico" ficou de fora para caber em celular de 360 px (sobram ~200 px para o texto). Não depende de conexão BLE.
 - Sem `indexedDB` ou `crypto.subtle` (`historyEnabled = false`), o bloco fica escondido.
 
 ### 13.8 Tela de coleta enxuta

@@ -202,10 +202,10 @@ Caso o BLE file transfer falhe (link instável, arquivo muito grande, etc.), há
 
 O app guarda no celular as **últimas 20 coletas baixadas**. Toda coleta entra sozinha no histórico quando o log é baixado (ao parar a coleta ou pelo "Baixar de novo"); baixar a mesma coleta duas vezes não cria item repetido. Quando entra a 21ª, a mais antiga sai.
 
-Toque em **"Historico (N)"** para abrir a lista. Cada linha mostra a data/hora do download (a mesma do nome do arquivo), a duração, o pico de pressão e o número de eventos marcados:
+Toque em **"Historico (N)"** para abrir a lista. Cada coleta ocupa uma linha com a data/hora do download (a mesma do nome do arquivo), a duração e o pico de pressão — por exemplo `22/10 14:45 · 1h12m · 6.8 bar` — e dois ícones à direita:
 
-- **Grafico:** abre o gráfico daquela coleta, com a data no título.
-- **Compartilhar:** envia o `log.csv` daquela coleta (WhatsApp, e-mail etc.).
+- **Ícone de gráfico** (cinza): abre o gráfico daquela coleta, com a data no título.
+- **Ícone de compartilhar** (azul, três pontos ligados): envia o `log.csv` daquela coleta (WhatsApp, e-mail etc.).
 
 O histórico funciona **sem conexão** com o equipamento e sem internet.
 
