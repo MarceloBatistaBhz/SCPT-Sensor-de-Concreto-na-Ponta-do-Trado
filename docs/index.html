@@ -456,22 +456,43 @@
       margin-top: 0.5rem;
     }
     .history-list { margin-top: 0.25rem; }
+    /* Uma linha por coleta: texto + botoes de icone (grafico, compartilhar) */
     .history-item {
-      padding: 0.65rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
       border-top: 1px solid #3a3a3a;
     }
     .history-item:first-child { border-top: none; }
     .history-meta {
+      flex: 1;
+      min-width: 0;
       font-size: 0.85rem;
       color: #dee2e6;
-      margin-bottom: 0.45rem;
+      white-space: nowrap;      /* sempre 1 linha; se nao couber, termina em "..." */
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .history-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem;
+    .history-icon {
+      flex: none;
+      background: transparent;
+      border: 1px solid #495057;
+      color: #adb5bd;
+      border-radius: 8px;
+      width: 40px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: transform 0.08s;
+      touch-action: manipulation;
     }
-    .history-actions .btn { padding: 0.55rem; font-size: 0.9rem; }
+    .history-icon:active { transform: scale(0.92); }
+    .history-icon.share { border-color: #4dabf7; color: #4dabf7; }
+    .history-icon svg { width: 20px; height: 20px; display: block; }
     .history-empty {
       font-size: 0.85rem;
       color: #868e96;
@@ -636,7 +657,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v22 &middot; tela de coleta enxuta &middot; Chrome/Edge no Android</p>
+  <p class="footer">v23 &middot; historico em 1 linha com icones &middot; Chrome/Edge no Android</p>
 
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
@@ -1410,23 +1431,31 @@
         row.className = 'history-item';
         const meta = document.createElement('div');
         meta.className = 'history-meta';
+        // Sem a palavra "pico" pra caber numa linha em celular de 360 px
         meta.textContent = historyLabel(it) + ' · ' + formatDuration(it.durationMs) +
-          (it.pMax !== null ? ' · pico ' + it.pMax.toFixed(1) + ' bar' : '') +
-          ' · ' + it.notes + (it.notes === 1 ? ' evento' : ' eventos');
-        const actions = document.createElement('div');
-        actions.className = 'history-actions';
-        const bChart = document.createElement('button');
-        bChart.className = 'btn btn-secondary';
-        bChart.textContent = 'Grafico';
+          (it.pMax !== null ? ' · ' + it.pMax.toFixed(1) + ' bar' : '');
+        const bChart = historyIconButton('Grafico', ICON_CHART, '');
         bChart.onclick = () => renderChart(it.bytes, 'Grafico de ' + historyLabel(it));
-        const bShare = document.createElement('button');
-        bShare.className = 'btn btn-primary';
-        bShare.textContent = 'Compartilhar';
+        const bShare = historyIconButton('Compartilhar', ICON_SHARE, 'share');
         bShare.onclick = () => shareFile(it.bytes, it.fname);
-        actions.append(bChart, bShare);
-        row.append(meta, actions);
+        row.append(meta, bChart, bShare);
         list.append(row);
       }
+    }
+
+    // Icones SVG inline (sem biblioteca, funciona offline)
+    const ICON_CHART = '<path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 6-7"/>';
+    const ICON_SHARE = '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/>' +
+                       '<circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>';
+
+    function historyIconButton(label, iconPaths, extraClass) {
+      const b = document.createElement('button');
+      b.className = 'history-icon' + (extraClass ? ' ' + extraClass : '');
+      b.title = label;
+      b.setAttribute('aria-label', label);
+      b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+                    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + iconPaths + '</svg>';
+      return b;
     }
 
     // === Grafico SVG do log.csv ===
