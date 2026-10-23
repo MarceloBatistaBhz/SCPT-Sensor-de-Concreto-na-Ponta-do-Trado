@@ -20,7 +20,7 @@ A operação é feita pelo celular Android através do **app SCPT** — um aplic
 
 | Item | Detalhe |
 |---|---|
-| Celular Android | Bluetooth + Chrome/Edge. **iOS não tem suporte a Web Bluetooth no Safari.** |
+| Celular ou tablet Android | Bluetooth + Chrome/Edge. **iOS não tem suporte a Web Bluetooth no Safari.** |
 | Cabo USB-C | Para carregar a bateria |
 | Carregador USB | 5 V, qualquer fonte de celular padrão |
 
@@ -29,7 +29,7 @@ https://marcelobatistabhz.github.io/SCPT-Sensor-de-Concreto-na-Ponta-do-Trado/
 
 ---
 
-## 3. Instalando o app SCPT no celular (uma vez só)
+## 3. Instalando o app SCPT no celular ou tablet (uma vez só)
 
 1. No celular Android, abra o **Chrome**.
 2. Acesse o link do app acima.
@@ -64,7 +64,9 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 ![Tela do app SCPT durante uma coleta](img/pwa-coleta.png)
 
-**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v24`). Informe a versão ao relatar algum problema.
+**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v28`). Informe a versão ao relatar algum problema.
+
+**No tablet** a tela é a mesma, na mesma ordem, mas ocupa a largura toda e mostra tudo maior: textos, botões, valores ao vivo e gráfico. O app se ajusta sozinho ao tamanho da tela e fica sempre em pé (retrato).
 
 **Card "Estado"** (de cima para baixo):
 - **Bateria**, no canto superior direito: percentual e tensão. Ao lado fica o botão de **números grandes**, que alterna para uma visão só com pressão e temperatura em fonte grande (para ler de longe).
