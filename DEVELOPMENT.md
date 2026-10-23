@@ -485,7 +485,7 @@ esp_pm_configure(&pm);
 - `setInterval` a cada 4 s tentando `device.gatt.connect()`, **uma tentativa por vez** (`reconnectInFlight`): com o logger fora do ar, `connect()` fica pendente mais que 4 s.
 - Reusa o mesmo `BluetoothDevice` (não exige nova interação do usuário).
 - Card vira laranja pulsante "Reconectando".
-- Botão Conectar vira "Reconectando... (toque pra cancelar)".
+- Botão Conectar vira "Cancelar reconexao" (cinza) — só fora da coleta; em `coll-mode` ele fica escondido para ninguém cancelar sem querer com o trado descendo (v29).
 
 ### 13.3 Streaming do CSV
 
@@ -553,6 +553,12 @@ No card Estado, `READY n=...` aparece só como `READY` e o "Iniciada as" só apa
 ### 13.9 Layout de tablet (v28)
 
 Um app só, responsivo: `@media (min-width: 700px) and (min-height: 700px)` (o Lenovo Tab TB311FU em pé tem ~800×1280 CSS px; a altura mínima evita que um celular deitado num navegador pegue este layout). Dentro dela: `html { font-size: 130% }` — quase todos os tamanhos são em `rem` e crescem ~30% —, `body` sem o limite de 480 px (`max-width: 900px`), `.status-live` 1.45rem e sparkline de 130 px (leitura em campo), `.btn` um pouco mais alto, e os tamanhos que são em px reajustados à mão (`.big-toggle`, bateria, `.history-icon`, lixeira, legenda, modais, toasts). O gráfico SVG (`viewBox` 360×220, `width: 100%`) acompanha a largura sozinho. O app continua travado em retrato (`"orientation": "portrait"` no manifest). Ao mexer em tamanho em px, conferir também o bloco de tablet. Prints de teste: Edge headless com `--window-size=800,1280` e `?state=` num script de simulação.
+
+**Pressão grande no tablet (v29):** `#statusBigP` fica à direita dos textos do card (`.status-mid` em flex), só no tablet e só em `coll-mode`; tamanho da fonte `min(92cqh, 46cqw)` com `container-type: size` (cabe até 4 caracteres, ex. `48.8`), `tabular-nums`. `body.coll-mode .status-mid { min-height: 8.6rem }` deixa o card ~10% mais alto. Some no modo números grandes.
+
+### 13.10 Indicador de conexão (v29)
+
+O botão `#btnConnect` não mostra mais "Conectado: LoggerP_C3": `setConnectedUi()` esconde o botão e mostra `#statusConn` ("● conectado", verde) ao lado do rótulo ESTADO; `setIdleUi()` volta "Conectar via Bluetooth" (azul); `setReconnectingUi()` mostra "Cancelar reconexao" (`btn-secondary`), escondido em `coll-mode`. Desconectado/Reconectando aparecem no próprio `statusValue`.
 ---
 
 ## 14. Referências

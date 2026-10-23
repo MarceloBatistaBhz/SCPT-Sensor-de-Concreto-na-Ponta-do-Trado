@@ -66,9 +66,10 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 **Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v28`). Informe a versão ao relatar algum problema.
 
-**No tablet** a tela é a mesma, na mesma ordem, mas ocupa a largura toda e mostra tudo maior: textos, botões, valores ao vivo e gráfico. O app se ajusta sozinho ao tamanho da tela e fica sempre em pé (retrato).
+**No tablet** a tela é a mesma, na mesma ordem, mas ocupa a largura toda e mostra tudo maior: textos, botões, valores ao vivo e gráfico. Durante a coleta, a **pressão ao vivo** aparece também em tamanho bem grande, à direita no card Estado (só o número, ex.: `0.7`), para ler de longe. O app se ajusta sozinho ao tamanho da tela e fica sempre em pé (retrato).
 
 **Card "Estado"** (de cima para baixo):
+- **● conectado** (verde), ao lado do rótulo ESTADO: o app está conectado ao equipamento. Desconectado ou reconectando, o próprio estado mostra `Desconectado` ou `Reconectando`.
 - **Bateria**, no canto superior direito: percentual e tensão. Ao lado fica o botão de **números grandes**, que alterna para uma visão só com pressão e temperatura em fonte grande (para ler de longe).
 - **Estado e contador de amostras**: por exemplo `COLL 1Hz n=1535` (coletando a 1 Hz, 1535 leituras gravadas).
 - **Valores ao vivo**: pressão em bar (azul) e temperatura em °C.
@@ -77,7 +78,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 - **Mini-gráfico dos últimos 60 s**: azul = pressão, laranja = média, cinza = temperatura.
 
 **Abaixo do card** (durante a coleta a tela fica enxuta: só **Parar coleta** e **Marcar Evento**; os demais botões voltam ao parar):
-- **Conectar via Bluetooth**: depois de conectado, mostra `Conectado: LoggerP_C3`.
+- **Conectar via Bluetooth**: só aparece quando o app não está conectado. Se a conexão cair fora de uma coleta, ele vira **Cancelar reconexao** (para parar as tentativas); durante a coleta ele não aparece.
 - **Iniciar coleta** (verde): aparece fora da coleta. **Parar coleta** (amarelo): aparece só durante a coleta.
 - **Marcar Evento** (laranja): só aparece durante a coleta (ver 7.4).
 - **Baixar de novo** (azul): só aparece se o download automático do log falhar (ver 7.6). Para compartilhar uma coleta, use o **Historico** (ver 7.6 e 7.10).
@@ -106,7 +107,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 2. Confirme **Bluetooth ligado** e **Localização ligada** (Android exige localização ativa para scan BLE — exigência do sistema).
 3. Toque em **"Conectar via Bluetooth"**.
 4. Escolha `LoggerP_C3` na lista que aparece.
-5. Em ~2 s o card "Estado" muda de "Desconectado" para `IDLE` (ou `READY` se houver log de sessão anterior).
+5. Em ~2 s o card "Estado" muda de "Desconectado" para `IDLE` (ou `READY` se houver log de sessão anterior), aparece **● conectado** ao lado de ESTADO e o botão "Conectar via Bluetooth" some.
 
 ### 7.2 Iniciar coleta
 
@@ -124,7 +125,7 @@ Durante a coleta a tela fica só com **Parar coleta** e **Marcar Evento**. Inici
 
 A taxa alterna automaticamente entre 1 Hz (regime estável) e 5 Hz (variações rápidas). Os dados são gravados em tempo real na flash interna.
 
-**Comportamento de campo (trado descendo):** se o celular sair de alcance (equipamento desce abaixo da superfície), a conexão BLE cai e o app mostra "Reconectando...". O equipamento **continua coletando normalmente**. Quando voltar para perto, o app reconecta sozinho em até 4 s.
+**Comportamento de campo (trado descendo):** se o celular sair de alcance (equipamento desce abaixo da superfície), a conexão BLE cai e o card Estado mostra "Reconectando". O equipamento **continua coletando normalmente**. Quando voltar para perto, o app reconecta sozinho em até 4 s.
 
 ### 7.4 Marcar Evento (anotações na timeline)
 
