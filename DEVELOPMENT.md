@@ -414,7 +414,7 @@ O service worker tem `cache: 'reload'` no install para bypassar o HTTP cache do 
 | Após disconnect, dispositivo "some" e exige reset | `ServerCallbacks::onDisconnect` não está reiniciando adv | Confirmar que `pServer->setCallbacks(new ServerCallbacks())` está em `setupBLE()` |
 | Com a placa no USB do PC, a conexão leva ~5 s e TARE/START/READ respondem aos trancos (some ao abrir o monitor serial) | Core 3.3.x: `Serial` USB (HWCDC) espera até ~2 s por print quando o PC não lê | Manter `Serial.setTxTimeoutMs(0)` logo após `Serial.begin()` |
 | Download dá "Header de stream invalido" depois de uma reconexão | Tentativas de reconexão sobrepostas rodavam o bind várias vezes e duplicavam o handler de `data` | Manter a trava `reconnectInFlight` em `tryReconnect()` e os handlers por atribuição (`oncharacteristicvaluechanged =`) em `bindCharacteristics()` |
-| PWA mostra valores antigos depois de update | Service worker servindo cache obsoleto | Esperar ~1 min após push (SW updates automaticamente). Se persistir, Configurações Android → Apps → "SCPT - Sensor de Concreto na Ponta do Trado" → Limpar dados |
+| PWA mostra valores antigos depois de update | Service worker servindo cache obsoleto | Esperar ~1 min após push (SW updates automaticamente) e abrir o app 2x. Se persistir, no Chrome: Configurações → Configurações do site → `marcelobatistabhz.github.io` → Limpar e redefinir. ⚠️ Isso (e "Limpar dados" do app no Android) **apaga o histórico** do IndexedDB (13.7) |
 
 ---
 
@@ -530,6 +530,17 @@ Tracking dos dedos via `Map<pointerId, {x, y}>` reproduz a ergonomia de `e.touch
 - `fetch`: cache-first para mesmo origin, network direto para outros origins (incluindo `http://192.168.4.1`).
 
 **Bumpar versão a cada update** é obrigatório para forçar reinstalação do SW.
+
+### 13.7 Histórico de coletas (IndexedDB)
+
+Banco `scpt-historico`, store `logs` (`keyPath: 'id'`, índice `savedAt`). Cada registro: `{ id, savedAt, fname, bytes, samples, durationMs, pMax, notes }`, com o CSV inteiro em `bytes` (`Uint8Array`).
+
+- **Entrada:** `finishStream()` chama `saveToHistory(localLog)` depois de todo download bem-sucedido (automático ou "Baixar de novo").
+- **Sem duplicata:** `id` = SHA-256 do conteúdo (`crypto.subtle`); baixar a mesma coleta de novo não grava outra vez.
+- **Limite:** `HISTORY_MAX = 20`; depois de gravar, apaga as chaves mais antigas pelo índice `savedAt`. 20 coletas máximas ≈ 5 MB.
+- **Persistência:** `navigator.storage.persist()` a cada gravação, para o Chrome não despejar o banco com o celular sem espaço (com o app instalado costuma ser concedido; não é garantido).
+- **UI:** `loadHistory()` na abertura do app e após cada gravação; `renderHistoryList()` monta o `<details id="historyBox">` com **Grafico** (`renderChart(bytes, 'Grafico de dd/mm hh:mm')`) e **Compartilhar** (`shareFile(bytes, fname)`). Não depende de conexão BLE.
+- Sem `indexedDB` ou `crypto.subtle` (`historyEnabled = false`), o bloco fica escondido.
 
 ---
 

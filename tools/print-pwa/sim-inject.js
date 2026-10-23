@@ -23,4 +23,14 @@
 
   // Horario de inicio fixo (o real depende do relogio de quem gera o print)
   $('statusStarted').textContent = 'Iniciada as 14:32:01';
+
+  // Historico com 3 coletas ficticias (aparece so o resumo, recolhido). O
+  // timeout roda depois do loadHistory() da abertura, que acharia o banco vazio.
+  setTimeout(function () {
+    historyItems = [1, 2, 3].map(function (i) {
+      return { id: 'sim' + i, savedAt: Date.now() - i * 86400000, fname: 'log_sim.csv',
+               bytes: new Uint8Array(0), samples: 3600, durationMs: 3600000, pMax: 6.5, notes: 4 };
+    });
+    renderHistoryList();
+  }, 500);
 })();

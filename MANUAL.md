@@ -77,6 +77,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 - **Iniciar coleta** (verde) e **Parar coleta** (amarelo).
 - **Marcar Evento** (laranja): só aparece durante a coleta (ver 7.4).
 - **Compartilhar** (azul): envia o log da última coleta, que o app baixa sozinho ao parar a coleta (ver 7.6). Se o download falhar, aparece ao lado o botão **Baixar de novo**.
+- **Historico (N)**: lista recolhida com as últimas 20 coletas baixadas, guardadas no celular (ver 7.10).
 - **Avançado**: menu recolhido com as funções menos usadas (apagar log, download via Wi-Fi etc.).
 
 **Cores do card Estado:**
@@ -107,7 +108,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 Toque em **"Iniciar coleta"** (botão verde). O estado muda para `COLL 1Hz n=0` e o contador começa a subir em tempo real.
 
-> ⚠️ A nova coleta **substitui o log anterior** no equipamento, e o gráfico e o log da coleta anterior somem da tela do app. Se ainda não compartilhou a coleta anterior, faça isso antes (ver 7.6).
+> ⚠️ A nova coleta **substitui o log anterior** no equipamento, e o gráfico da coleta anterior sai da tela do app. Se o log anterior foi baixado (o app baixa sozinho ao parar), ele continua no **Histórico** do celular (ver 7.10).
 
 Aparecem também:
 - **"Iniciada às HH:MM:SS"** — horário do celular em que você iniciou.
@@ -160,7 +161,7 @@ O nome do arquivo já vem com a data/hora do download: `log_2026-05-10_14-32-01.
 
 **Se o download falhar** (Bluetooth caiu, equipamento longe), o app avisa e aparece o botão **"Baixar de novo"** ao lado do Compartilhar. Aproxime o celular e toque nele. Se a conexão cair no meio do download, o app tenta de novo sozinho quando reconectar.
 
-O log baixado fica no app até a próxima **"Iniciar coleta"**. Se o app for fechado, ele baixa de novo do equipamento na próxima conexão.
+O botão **Compartilhar** envia sempre a última coleta, até a próxima **"Iniciar coleta"**. Se o app for fechado, ele baixa de novo do equipamento na próxima conexão. Toda coleta baixada também fica no **Histórico** (ver 7.10), de onde pode ser compartilhada depois.
 
 ### 7.7 Ver gráfico
 
@@ -194,6 +195,19 @@ Caso o BLE file transfer falhe (link instável, arquivo muito grande, etc.), há
 4. Conecte na rede `LoggerP_AP` (sem senha). Aceite "manter conectado mesmo sem internet".
 5. Volte no app e toque em **"Abrir log.csv"**.
 6. O navegador baixa o arquivo. Compartilhe via menu do sistema do celular.
+
+### 7.10 Histórico de coletas
+
+O app guarda no celular as **últimas 20 coletas baixadas**. Toda coleta entra sozinha no histórico quando o log é baixado (ao parar a coleta ou pelo "Baixar de novo"); baixar a mesma coleta duas vezes não cria item repetido. Quando entra a 21ª, a mais antiga sai.
+
+Toque em **"Historico (N)"** para abrir a lista. Cada linha mostra a data/hora do download (a mesma do nome do arquivo), a duração, o pico de pressão e o número de eventos marcados:
+
+- **Grafico:** abre o gráfico daquela coleta, com a data no título.
+- **Compartilhar:** envia o `log.csv` daquela coleta (WhatsApp, e-mail etc.).
+
+O histórico funciona **sem conexão** com o equipamento e sem internet.
+
+> ⚠️ O histórico fica **dentro do app**. Desinstalar o app ou usar "Limpar dados" nas configurações do Android apaga o histórico. Compartilhe as coletas importantes.
 
 ---
 
@@ -263,6 +277,7 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 | Indicador de bateria sumiu | Pode ser desconexão recente | Aguarde uns segundos; aparece novamente quando o status atualiza |
 | Após queda de energia, aparece `READY` no boot | Sessão anterior interrompida | Os dados gravados estão preservados. Ao conectar, o app baixa o log sozinho; compartilhe antes de um novo "Iniciar coleta" |
 | Equipamento parou de gravar antes de 2 h | Bateria acabou | Recarregue. Os dados gravados estão preservados |
+| Histórico sumiu ou ficou vazio | App desinstalado, ou dados do app limpos nas configurações do Android | Não há como recuperar no celular. As coletas compartilhadas continuam onde foram enviadas, e a última coleta continua no equipamento até o próximo "Iniciar coleta" |
 
 ### Forçar reset do equipamento
 
