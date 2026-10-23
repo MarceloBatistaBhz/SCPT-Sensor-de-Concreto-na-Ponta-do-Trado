@@ -73,6 +73,14 @@
       color: #adb5bd;
       letter-spacing: 1px;
     }
+    /* "● conectado" ao lado do rotulo ESTADO (substitui o "Conectado: LoggerP_C3"
+       do botao). Desconectado/Reconectando ja aparecem no proprio estado. */
+    .status-conn {
+      font-size: 0.75rem;
+      color: #51cf66;
+      letter-spacing: 0.5px;
+      margin-left: 0.6rem;
+    }
     .status-row-top {
       display: flex;
       justify-content: space-between;
@@ -168,6 +176,10 @@
       opacity: 0.9;
     }
     .status-card.big-mode .status-live .lv-sep { display: none; }
+    /* Meio do card: textos a esquerda + (so no tablet) pressao gigante a direita */
+    .status-mid { display: flex; align-items: stretch; gap: 1rem; }
+    .status-texts { flex: 0 1 auto; min-width: 0; }
+    .status-bigp { display: none; }
     .status-sparkline {
       margin-top: 0.6rem;
       border-top: 1px solid #1f2933;
@@ -226,6 +238,7 @@
        em "Reconectando" no meio de uma coleta (ver collectMode). Fora da
        coleta e o contrario: some o Parar e o Iniciar ocupa a linha toda */
     body:not(.coll-mode) #btnStop,
+    body.coll-mode #btnConnect,     /* "Cancelar reconexao" nao aparece na coleta */
     body.coll-mode #btnStart,
     body.coll-mode #shareRow,
     body.coll-mode #historyBox,
@@ -581,6 +594,28 @@
       body { max-width: 900px; padding: 1.25rem 1.5rem; }
       .btn { padding: 1.2rem; }
       .status-live { font-size: 1.45rem; }        /* pressao/temp ao vivo: ler de longe */
+      /* Pressao gigante no espaco vazio a direita dos textos, so na coleta.
+         container-type: o tamanho da fonte acompanha a caixa (altura e
+         largura), cabendo ate 4 caracteres ("48.8", "-0.1"). O min-height
+         deixa o card ~10% mais alto pra dar espaco ao numero. */
+      body.coll-mode .status-mid { min-height: 8.6rem; }
+      body.coll-mode .status-bigp:not([hidden]) {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        align-items: center;
+        justify-content: flex-end;
+        container-type: size;
+      }
+      .status-bigp span {
+        font-size: min(92cqh, 46cqw);
+        line-height: 1;
+        font-weight: 700;
+        color: #4dabf7;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .status-card.big-mode .status-bigp { display: none !important; }
       .status-sparkline svg { height: 130px; }
       .big-toggle { width: 42px; height: 36px; }
       .big-toggle svg { width: 21px; height: 21px; }
@@ -599,11 +634,11 @@
 </head>
 <body>
   <!-- Versao do app: bumpar junto com CACHE em sw.js -->
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v28</span></span></h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v29</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
-      <span class="status-label">Estado</span>
+      <span><span class="status-label">Estado</span><span class="status-conn" id="statusConn" hidden>&#9679; conectado</span></span>
       <span class="status-row-right">
         <span class="status-battery" id="statusBattery" hidden>
           <svg viewBox="0 0 26 12" fill="currentColor" aria-hidden="true">
@@ -620,10 +655,16 @@
         </button>
       </span>
     </div>
-    <div class="status-value" id="statusValue">Desconectado</div>
-    <div class="status-live" id="statusLive" hidden></div>
-    <div class="status-started" id="statusStarted" hidden></div>
-    <div class="status-countdown" id="statusCountdown" hidden></div>
+    <div class="status-mid">
+      <div class="status-texts">
+        <div class="status-value" id="statusValue">Desconectado</div>
+        <div class="status-live" id="statusLive" hidden></div>
+        <div class="status-started" id="statusStarted" hidden></div>
+        <div class="status-countdown" id="statusCountdown" hidden></div>
+      </div>
+      <!-- Pressao ao vivo gigante, so no tablet durante a coleta -->
+      <div class="status-bigp" id="statusBigP" hidden><span id="statusBigPVal"></span></div>
+    </div>
     <div class="status-sparkline" id="statusSparkline" hidden></div>
   </div>
 
@@ -1084,8 +1125,12 @@
           '<span class="lv-sep"> &middot; </span>' +
           '<span class="lv-t">' + liveTemp.toFixed(1) + ' &deg;C</span>';
         pushLiveSample(livePres, liveTemp);
+        // Numero gigante: o CSS so mostra no tablet (ver .status-bigp)
+        $('statusBigPVal').textContent = livePres.toFixed(1);
+        $('statusBigP').hidden = false;
       } else {
         $('statusLive').hidden = true;
+        $('statusBigP').hidden = true;
       }
       // Botao big-mode so faz sentido quando ha live data
       $('btnBigMode').hidden = !hasLive;
@@ -2026,17 +2071,25 @@
       streamWatchdog = setTimeout(() => failDownload('Sem resposta do logger'), 5000);
     }
 
+    // Conexao: o card Estado mostra "● conectado" (ou Desconectado/Reconectando
+    // no proprio estado). O botao so aparece quando NAO esta conectado.
     function setConnectedUi() {
-      $('btnConnect').textContent = 'Conectado: ' + device.name;
-      $('btnConnect').disabled = true;
+      $('btnConnect').hidden = true;
+      $('statusConn').hidden = false;
     }
     function setIdleUi() {
+      $('btnConnect').hidden = false;
       $('btnConnect').textContent = 'Conectar via Bluetooth';
+      $('btnConnect').className = 'btn btn-primary';
       $('btnConnect').disabled = false;
+      $('statusConn').hidden = true;
     }
     function setReconnectingUi() {
-      $('btnConnect').textContent = 'Reconectando... (toque pra cancelar)';
+      $('btnConnect').hidden = false;
+      $('btnConnect').textContent = 'Cancelar reconexao';
+      $('btnConnect').className = 'btn btn-secondary';
       $('btnConnect').disabled = false;
+      $('statusConn').hidden = true;
     }
 
     async function connect() {
