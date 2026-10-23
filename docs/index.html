@@ -498,6 +498,12 @@
     }
     .history-icon:active { transform: scale(0.92); }
     .history-icon.share { border-color: #4dabf7; color: #4dabf7; }
+    .history-icon.danger { border-color: #ff6b6b; color: #ff6b6b; width: 34px; height: 30px; }
+    .history-icon.danger svg { width: 18px; height: 18px; }
+    /* Cabecalho do Historico: texto + seta a esquerda, lixeira a direita */
+    #historyBox summary { display: flex; align-items: center; gap: 0.3rem; }
+    #historyBox summary::after { order: 1; }
+    #historyBox summary .history-icon { order: 2; margin-left: auto; }
     .history-icon svg { width: 20px; height: 20px; display: block; }
     .history-empty {
       font-size: 0.85rem;
@@ -567,7 +573,7 @@
 </head>
 <body>
   <!-- Versao do app: bumpar junto com CACHE em sw.js -->
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v26</span></span></h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v27</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
@@ -635,7 +641,13 @@
 
   <!-- Ultimas coletas baixadas, guardadas no celular (IndexedDB) -->
   <details id="historyBox">
-    <summary id="historySummary">Historico (0)</summary>
+    <summary><span id="historySummary">Historico (0)</span>
+      <button class="history-icon danger" id="btnClearHistory" title="Apagar historico" aria-label="Apagar historico" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>
+        </svg>
+      </button>
+    </summary>
     <div class="history-list" id="historyList"></div>
   </details>
 
@@ -1397,8 +1409,25 @@
     }
 
     // Guarda o log baixado. Retorna false se essa coleta ja estava no historico.
+    // Coletas apagadas com a lixeira do Historico. O ultimo log da obra
+    // anterior continua no equipamento e o app o baixa sozinho ao conectar;
+    // sem esta lista ele voltaria pro historico recem-apagado.
+    const CLEARED_KEY = 'scpt-historico-apagadas';
+    const CLEARED_MAX = 200;
+    function clearedIds() {
+      try { return new Set(JSON.parse(localStorage.getItem(CLEARED_KEY) || '[]')); }
+      catch (_) { return new Set(); }
+    }
+    function rememberCleared(ids) {
+      try {
+        const all = [...clearedIds(), ...ids].slice(-CLEARED_MAX);
+        localStorage.setItem(CLEARED_KEY, JSON.stringify(all));
+      } catch (_) { /* sem localStorage: a coleta antiga pode voltar, sem outro efeito */ }
+    }
+
     async function saveToHistory(log) {
       const id = await sha256Hex(log.bytes);
+      if (clearedIds().has(id)) return false;   // apagada de proposito: nao volta
       if (await idbDone((await historyStore('readonly')).get(id))) return false;
       const data = parseCsvBytes(log.bytes);
       await idbDone((await historyStore('readwrite')).put({
@@ -1446,8 +1475,29 @@
              d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     }
 
+    // Lixeira do cabecalho: apaga o historico inteiro (ex.: comecar obra nova)
+    async function clearHistory(e) {
+      e.preventDefault();      // dentro do <summary>: nao abre/fecha a lista
+      e.stopPropagation();
+      const n = historyItems.length;
+      if (!n) return;
+      if (!confirm('Apagar o historico inteiro (' + n + (n === 1 ? ' coleta' : ' coletas') +
+                   ')? Nao pode ser desfeito.')) return;
+      try {
+        rememberCleared(historyItems.map((it) => it.id));
+        await idbDone((await historyStore('readwrite')).clear());
+        hideChart();             // o grafico na tela podia ser de uma coleta apagada
+        showToast('Historico apagado', 'success', 2500);
+      } catch (err) {
+        logLine('Falha ao apagar o historico: ' + err.message, 'err');
+        showToast('Falha ao apagar o historico', 'error');
+      }
+      loadHistory();
+    }
+
     function renderHistoryList() {
       $('historySummary').textContent = 'Historico (' + historyItems.length + ')';
+      $('btnClearHistory').hidden = !historyItems.length;
       const list = $('historyList');
       list.innerHTML = '';
       if (!historyItems.length) {
@@ -2108,6 +2158,7 @@
     $('btnStop').onclick        = () => sendCmd('STOP');
     $('btnDownloadBle').onclick = () => startBleDownload('manual');
     $('btnShare').onclick       = shareLocalLog;
+    $('btnClearHistory').onclick = clearHistory;
     $('btnCloseChart').onclick  = hideChart;
     $('btnDownload').onclick    = () => sendCmd('DOWNLOAD');
     $('btnStopWifi').onclick    = () => sendCmd('STOPWIFI');
