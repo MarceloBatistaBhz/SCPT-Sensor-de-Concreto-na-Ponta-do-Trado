@@ -39,6 +39,7 @@
       color: #adb5bd;
       margin-top: 0.15rem;
     }
+    h1 .app-version { color: #6c757d; }
     .status-card {
       background: #2a2a2a;
       border-radius: 12px;
@@ -501,12 +502,6 @@
     .log-line { margin-bottom: 0.2rem; word-break: break-all; }
     .log-line.err { color: #ff6b6b; }
     .log-line.ok  { color: #51cf66; }
-    .footer {
-      text-align: center;
-      color: #6c757d;
-      font-size: 0.75rem;
-      margin-top: 0.5rem;
-    }
 
     /* Fade-in suave em elementos que aparecem dinamicamente.
        Quando [hidden] e removido, o elemento volta a casar
@@ -566,7 +561,8 @@
   </style>
 </head>
 <body>
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado</span></h1>
+  <!-- Versao do app: bumpar junto com CACHE em sw.js -->
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v24</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
@@ -604,10 +600,12 @@
   <button class="btn btn-mark" id="btnMarkMoment" hidden>Marcar Evento</button>
 
   <!-- O log baixa sozinho ao parar a coleta (ou ao conectar com coleta
-       encerrada). "Baixar de novo" so aparece se o download falhar. -->
-  <div class="btn-row btn-row-auto" id="shareRow">
+       encerrada). "Baixar de novo" so aparece se o download falhar.
+       Compartilhar fica no Historico; este botao so aparece se o log nao
+       puder ir pro historico (sem IndexedDB ou falha ao gravar). -->
+  <div class="btn-row btn-row-auto" id="shareRow" hidden>
     <button class="btn btn-primary" id="btnDownloadBle" hidden>Baixar de novo</button>
-    <button class="btn btn-primary" id="btnShare" disabled>Compartilhar</button>
+    <button class="btn btn-primary" id="btnShare" hidden>Compartilhar</button>
   </div>
 
   <div class="progress" id="progressBox" hidden>
@@ -657,7 +655,6 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v23 &middot; historico em 1 linha com icones &middot; Chrome/Edge no Android</p>
 
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
@@ -716,6 +713,10 @@
 
     // Log da ultima coleta ja baixado no celular (alimenta grafico e Compartilhar)
     let localLog          = null;   // { bytes, fname, n }
+    // Historico no IndexedDB (ver saveToHistory). Declarado aqui em cima porque
+    // updateActionButtons() le essas duas.
+    const historyEnabled  = 'indexedDB' in window && !!(window.crypto && crypto.subtle);
+    let historySaveFailed = false;  // ultimo log nao foi pro historico -> Compartilhar aqui
     let downloadInFlight  = false;  // READ enviado e download ainda nao terminou
     let downloadFailed    = false;  // ultimo download falhou -> "Baixar de novo"
     let autoDownloadArmed = false;  // proximo estado READY dispara o download sozinho
@@ -1111,7 +1112,11 @@
 
       $('btnDownloadBle').hidden   = !(downloadFailed && isReady && connected);
       $('btnDownloadBle').disabled = busy;
-      $('btnShare').disabled       = !localLog || busy;
+      // Compartilhar fica no Historico. Aqui so como reserva, se o ultimo log
+      // nao pode ir pro historico; a linha some quando nao ha botao nela.
+      $('btnShare').hidden         = !(localLog && (!historyEnabled || historySaveFailed));
+      $('btnShare').disabled       = busy;
+      $('shareRow').hidden         = $('btnDownloadBle').hidden && $('btnShare').hidden;
 
       $('btnOpenCsv').hidden = !isServing;
       $('wifiHint').hidden   = !isServing;
@@ -1143,8 +1148,9 @@
       hideChart();
       chartData      = null;
       chartView      = null;
-      localLog       = null;
-      downloadFailed = false;
+      localLog          = null;
+      downloadFailed    = false;
+      historySaveFailed = false;
       updateActionButtons();
     }
 
@@ -1291,10 +1297,15 @@
       updateActionButtons();
 
       // Entra no historico do celular (sem duplicata; ficam as 20 mais recentes)
+      historySaveFailed = false;
       if (historyEnabled) {
         saveToHistory(localLog)
           .then((added) => { if (added) loadHistory(); })
-          .catch((e) => logLine('Falha ao guardar no historico: ' + e.message, 'err'));
+          .catch((e) => {
+            logLine('Falha ao guardar no historico: ' + e.message, 'err');
+            historySaveFailed = true;   // mostra o Compartilhar de reserva
+            updateActionButtons();
+          });
       }
     }
 
@@ -1334,7 +1345,6 @@
     const HISTORY_MAX   = 20;
     const HISTORY_DB    = 'scpt-historico';
     const HISTORY_STORE = 'logs';
-    const historyEnabled = 'indexedDB' in window && !!(window.crypto && crypto.subtle);
     let historyDb    = null;   // Promise<IDBDatabase>
     let historyItems = [];     // registros carregados, mais recente primeiro
 

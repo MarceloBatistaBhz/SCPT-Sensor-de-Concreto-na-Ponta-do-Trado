@@ -1,6 +1,6 @@
 // Service worker minimo: cache-first pros assets do app, network passa direto
 // pra qualquer outra coisa (como o http://192.168.4.1/log.csv).
-const CACHE = 'loggerp-pwa-v23';
+const CACHE = 'loggerp-pwa-v24';
 const ASSETS = [
   './',
   './index.html',
