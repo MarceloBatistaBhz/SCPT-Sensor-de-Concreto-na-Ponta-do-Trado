@@ -567,7 +567,7 @@
 </head>
 <body>
   <!-- Versao do app: bumpar junto com CACHE em sw.js -->
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v25</span></span></h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v26</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
@@ -724,7 +724,12 @@
     let historySaveFailed = false;  // ultimo log nao foi pro historico -> Compartilhar aqui
     let downloadInFlight  = false;  // READ enviado e download ainda nao terminou
     let downloadFailed    = false;  // ultimo download falhou -> "Baixar de novo"
-    let autoDownloadArmed = false;  // proximo estado READY dispara o download sozinho
+    // Proximo estado READY dispara o download sozinho. Guarda o motivo:
+    // 'stop' (coleta parou com o app vendo) ou 'connect' (app conectou).
+    let autoDownloadArmed = null;
+    // Motivo do download em andamento: 'stop' | 'connect' | 'manual'. So o
+    // 'connect' e silencioso: nao abre o grafico (abre-se pelo Historico).
+    let downloadReason    = null;
 
     // Chart geometry (hoisted pra ser usado em renderChart e nos handlers de touch)
     const CHART_W      = 360;
@@ -1030,7 +1035,7 @@
       // Coleta nova: grafico e log da coleta anterior saem da tela.
       // Coleta encerrada com o app olhando (Parar ou auto-stop): baixa sozinho.
       if (isColl && !wasColl) clearSessionLog();
-      if (wasColl && visibleText.startsWith('READY')) autoDownloadArmed = true;
+      if (wasColl && visibleText.startsWith('READY')) autoDownloadArmed = 'stop';
 
       // Live values + sparkline durante COLL
       const hasLive = isColl && livePres !== null && liveTemp !== null;
@@ -1137,7 +1142,8 @@
     // So baixa se o logger estiver em READY e o celular ainda nao tiver esse log.
     function maybeAutoDownload() {
       if (!autoDownloadArmed || !cmdChar) return;
-      autoDownloadArmed = false;
+      const reason = autoDownloadArmed;
+      autoDownloadArmed = null;
       const st = lastSeenState;
       if (!st.startsWith('READY') || downloadInFlight) return;
       if (localLog && localLog.n === readyCount(st)) return;
@@ -1145,7 +1151,7 @@
       // pra nao compartilhar o arquivo errado se o download falhar
       if (localLog) clearSessionLog();
       logLine('Baixando o log automaticamente...');
-      startBleDownload();
+      startBleDownload(reason);
     }
 
     // Coleta nova: some com o grafico e o log baixado da coleta anterior
@@ -1203,8 +1209,9 @@
       await dataChar.startNotifications();
 
       // Conectou com coleta encerrada que o celular ainda nao tem: baixa
-      // sozinho. Armado so aqui, com o canal de dados ja escutando.
-      autoDownloadArmed = true;
+      // sozinho, sem abrir o grafico. Armado so aqui, com o canal de dados
+      // ja escutando.
+      autoDownloadArmed = 'connect';
 
       const initial = await statChar.readValue();
       applyState(new TextDecoder().decode(initial));
@@ -1291,13 +1298,16 @@
         '.csv';
 
       logLine('Transferencia completa (' + streamReceived + ' bytes).', 'ok');
-      showToast('Log baixado (' + (streamReceived / 1024).toFixed(1) + ' KB)', 'success');
+      // Download ao conectar e silencioso: sem grafico, e aviso so se a coleta
+      // for nova (terminou longe do celular) — ver o .then do saveToHistory
+      const quiet = (downloadReason === 'connect') && historyEnabled;
+      if (!quiet) showToast('Log baixado (' + (streamReceived / 1024).toFixed(1) + ' KB)', 'success');
 
       // Guarda o log pro botao Compartilhar; n identifica a coleta
       localLog = { bytes: total, fname, n: readyCount(lastSeenState) };
       downloadInFlight = false;
       downloadFailed   = false;
-      renderChart(total);
+      if (downloadReason !== 'connect') renderChart(total);
       resetStream();
       updateActionButtons();
 
@@ -1305,7 +1315,11 @@
       historySaveFailed = false;
       if (historyEnabled) {
         saveToHistory(localLog)
-          .then((added) => { if (added) loadHistory(); })
+          .then((added) => {
+            if (!added) return;
+            loadHistory();
+            if (quiet) showToast('Coleta do equipamento guardada no Historico', 'success', 4000);
+          })
           .catch((e) => {
             logLine('Falha ao guardar no historico: ' + e.message, 'err');
             historySaveFailed = true;   // mostra o Compartilhar de reserva
@@ -1922,10 +1936,12 @@
     }
     setupChartTouch();
 
-    function startBleDownload() {
+    // reason: 'stop' | 'connect' | 'manual' (ver downloadReason)
+    function startBleDownload(reason) {
       if (!dataChar) { logLine('Stream nao disponivel', 'err'); return; }
       if (downloadInFlight || streamTotal > 0) { logLine('Download ja em andamento', 'err'); return; }
       resetStream();
+      downloadReason   = reason || 'manual';
       downloadInFlight = true;
       updateActionButtons();
       showProgress(0);
@@ -2090,7 +2106,7 @@
 
     $('btnStart').onclick       = performTareAndStart;
     $('btnStop').onclick        = () => sendCmd('STOP');
-    $('btnDownloadBle').onclick = startBleDownload;
+    $('btnDownloadBle').onclick = () => startBleDownload('manual');
     $('btnShare').onclick       = shareLocalLog;
     $('btnCloseChart').onclick  = hideChart;
     $('btnDownload').onclick    = () => sendCmd('DOWNLOAD');
