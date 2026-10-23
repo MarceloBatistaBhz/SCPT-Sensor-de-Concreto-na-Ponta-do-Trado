@@ -295,6 +295,11 @@
       font-family: ui-monospace, "Consolas", monospace;
       line-height: 1.5;
     }
+    .chart-legend {
+      display: flex;
+      gap: 0.9rem;
+      white-space: nowrap;
+    }
     .lg-line {
       display: inline-block;
       width: 14px;
@@ -562,7 +567,7 @@
 </head>
 <body>
   <!-- Versao do app: bumpar junto com CACHE em sw.js -->
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v24</span></span></h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v25</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
@@ -1518,25 +1523,11 @@
 
       let pMax = -Infinity, pMaxIdx = 0;
       let pMin = Infinity;
-      let sum = 0, sumSq = 0;
-      const sortedP = new Array(points.length);
       for (let i = 0; i < points.length; i++) {
         const v = points[i][1];
         if (v > pMax) { pMax = v; pMaxIdx = i; }
         if (v < pMin) pMin = v;
-        sum += v;
-        sumSq += v * v;
-        sortedP[i] = v;
       }
-      const n = points.length;
-      const pMean = sum / n;
-      // variancia populacional; clamp em 0 pra evitar sqrt de negativo por arredondamento
-      const pVar = Math.max(0, sumSq / n - pMean * pMean);
-      const pStd = Math.sqrt(pVar);
-      sortedP.sort((a, b) => a - b);
-      const pMedian = (n % 2 === 0)
-        ? (sortedP[n / 2 - 1] + sortedP[n / 2]) / 2
-        : sortedP[(n - 1) / 2];
 
       // Eixo de temperatura: centrado em T_init, minimo +/- 5 °C
       let tInit = NaN, tFinal = NaN, tAxisMin = NaN, tAxisMax = NaN;
@@ -1564,9 +1555,6 @@
         pMax,
         pMaxIdx,
         pMin,
-        pMean,
-        pMedian,
-        pStd,
         tMin: points[0][0],
         tMax: points[points.length - 1][0],
         hasTemp,
@@ -1609,7 +1597,7 @@
 
     function drawChart() {
       if (!chartData || !chartView) return;
-      const { points, ma, pMax, pMaxIdx, pMin, pMean, pMedian, pStd,
+      const { points, ma, pMax, pMaxIdx, pMin,
               tMin, tMax,
               hasTemp, tInit, tFinal, tAxisMin, tAxisMax,
               notes } = chartData;
@@ -1756,11 +1744,12 @@
       const zoom = fullRange / duration;
       const zoomLabel = zoom > 1.05 ? ' | zoom ' + zoom.toFixed(1) + 'x' : '';
       const peakS = (points[pMaxIdx][0] - tMin) / 1000;
+      // Legenda numa linha so (chart-legend nao quebra)
       let legend =
-        '<span class="lg-line lg-blue"></span> pressao' +
-        ' &nbsp; <span class="lg-line lg-orange"></span> media (' + MA_WINDOW + ')';
+        '<span><span class="lg-line lg-blue"></span>pressao</span>' +
+        '<span><span class="lg-line lg-orange"></span>media (' + MA_WINDOW + ')</span>';
       if (hasTemp) {
-        legend += ' &nbsp; <span class="lg-line lg-gray"></span> temperatura';
+        legend += '<span><span class="lg-line lg-gray"></span>temp</span>';
       }
 
       // Linha 1: resumo da janela inteira (+ contagem de anotacoes, se houver)
@@ -1770,10 +1759,8 @@
       const line1 = points.length + ' amostras | pico ' + pMax.toFixed(2) + ' bar @ ' +
         formatTime(peakS) + ' | duracao ' + formatTime(fullRange / 1000) +
         noteCountLbl + zoomLabel;
-      // Linha 2: estatisticas da pressao
-      const line2 = 'media ' + pMean.toFixed(2) + ' &middot; mediana ' + pMedian.toFixed(2) +
-        ' &middot; &sigma; ' + pStd.toFixed(2) +
-        ' &middot; min ' + pMin.toFixed(2) + ' &middot; max ' + pMax.toFixed(2) + ' bar';
+      // Linha 2: faixa da pressao
+      const line2 = 'min ' + pMin.toFixed(2) + ' &middot; max ' + pMax.toFixed(2) + ' bar';
       // Linha 3: temperatura (se houver)
       let line3 = '';
       if (hasTemp && isFinite(tInit) && isFinite(tFinal)) {
@@ -1786,7 +1773,7 @@
       $('chartInfo').innerHTML =
         line1 + '<br>' + line2 +
         (line3 ? '<br>' + line3 : '') +
-        '<br>' + legend;
+        '<div class="chart-legend">' + legend + '</div>';
     }
 
     function hideChart() {
