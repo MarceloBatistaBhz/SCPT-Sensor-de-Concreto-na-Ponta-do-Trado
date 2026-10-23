@@ -542,6 +542,12 @@ Banco `scpt-historico`, store `logs` (`keyPath: 'id'`, índice `savedAt`). Cada 
 - **UI:** `loadHistory()` na abertura do app e após cada gravação; `renderHistoryList()` monta o `<details id="historyBox">` com **Grafico** (`renderChart(bytes, 'Grafico de dd/mm hh:mm')`) e **Compartilhar** (`shareFile(bytes, fname)`). Não depende de conexão BLE.
 - Sem `indexedDB` ou `crypto.subtle` (`historyEnabled = false`), o bloco fica escondido.
 
+### 13.8 Tela de coleta enxuta
+
+`applyState()` mantém `collectMode` e liga a classe `coll-mode` no `<body>`: `COLL` liga; `IDLE`/`READY`/`WIFI`/`Desconectado` desliga; **`Reconectando` mantém** o valor anterior (no meio de uma coleta o trado desce e a conexão cai, e a tela não deve se encher de botões). O CSS esconde, com `coll-mode`, `#btnStart`, `#shareRow` (Compartilhar/Baixar de novo), `#historyBox` e `#advancedBox`; sem ela, esconde `#btnStop`. As linhas de botões usam `.btn-row-auto` (colunas só para os botões visíveis), então o botão que sobra ocupa a largura toda.
+
+No card Estado, `READY n=...` aparece só como `READY` e o "Iniciada as" só aparece com `collectMode`. O `n=` continua em `lastSeenState`: é ele que identifica a coleta no download automático (13.3).
+
 ---
 
 ## 14. Referências

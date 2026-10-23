@@ -68,13 +68,13 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 - **Bateria**, no canto superior direito: percentual e tensão. Ao lado fica o botão de **números grandes**, que alterna para uma visão só com pressão e temperatura em fonte grande (para ler de longe).
 - **Estado e contador de amostras**: por exemplo `COLL 1Hz n=1535` (coletando a 1 Hz, 1535 leituras gravadas).
 - **Valores ao vivo**: pressão em bar (azul) e temperatura em °C.
-- **"Iniciada às HH:MM:SS"**: horário do celular em que a coleta começou.
+- **"Iniciada às HH:MM:SS"**: horário do celular em que a coleta começou (só durante a coleta).
 - **"Auto-stop em H:MM:SS"**: quanto falta para a parada automática de 2 horas.
 - **Mini-gráfico dos últimos 60 s**: azul = pressão, laranja = média, cinza = temperatura.
 
-**Abaixo do card:**
+**Abaixo do card** (durante a coleta a tela fica enxuta: só **Parar coleta** e **Marcar Evento**; os demais botões voltam ao parar):
 - **Conectar via Bluetooth**: depois de conectado, mostra `Conectado: LoggerP_C3`.
-- **Iniciar coleta** (verde) e **Parar coleta** (amarelo).
+- **Iniciar coleta** (verde): aparece fora da coleta. **Parar coleta** (amarelo): aparece só durante a coleta.
 - **Marcar Evento** (laranja): só aparece durante a coleta (ver 7.4).
 - **Compartilhar** (azul): envia o log da última coleta, que o app baixa sozinho ao parar a coleta (ver 7.6). Se o download falhar, aparece ao lado o botão **Baixar de novo**.
 - **Historico (N)**: lista recolhida com as últimas 20 coletas baixadas, guardadas no celular (ver 7.10).
@@ -114,6 +114,8 @@ Aparecem também:
 - **"Iniciada às HH:MM:SS"** — horário do celular em que você iniciou.
 - **"Auto-stop em H:MM:SS"** — quanto tempo falta para o auto-stop de 2 horas.
 
+Durante a coleta a tela fica só com **Parar coleta** e **Marcar Evento**. Iniciar coleta, Compartilhar, Historico e Avançado somem e voltam quando a coleta para — inclusive se a conexão cair no meio ("Reconectando..."), a tela continua enxuta.
+
 ### 7.3 Durante a coleta
 
 A taxa alterna automaticamente entre 1 Hz (regime estável) e 5 Hz (variações rápidas). Os dados são gravados em tempo real na flash interna.
@@ -142,7 +144,7 @@ Toque na opção desejada → toast confirma "Marcado: ..." → o modal fecha.
 
 ### 7.5 Parar coleta
 
-Toque em **"Parar coleta"** (botão amarelo). Estado muda para `READY n=...` com a contagem total e o app **baixa o log sozinho**: a barra de progresso enche em ~3-10 segundos via Bluetooth e o gráfico aparece logo abaixo (ver 7.7).
+Toque em **"Parar coleta"** (botão amarelo). Estado muda para `READY` e o app **baixa o log sozinho**: a barra de progresso enche em ~3-10 segundos via Bluetooth e o gráfico aparece logo abaixo (ver 7.7).
 
 Alternativamente, a coleta para automaticamente:
 - Após **2 horas** (limite máximo de sessão).
