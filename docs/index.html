@@ -214,13 +214,21 @@
       grid-template-columns: 1fr 1fr;
       gap: 0.75rem;
     }
-    /* Colunas so pros botoes visiveis: sem o "Baixar de novo",
-       o Compartilhar ocupa a largura toda */
-    .btn-row-share {
+    /* Colunas so pros botoes visiveis: sem o "Baixar de novo" o
+       Compartilhar ocupa a largura toda; na coleta, o Parar idem */
+    .btn-row-auto {
       grid-template-columns: none;
       grid-auto-flow: column;
       grid-auto-columns: 1fr;
     }
+    /* Tela de coleta enxuta: so Parar coleta e Marcar Evento. Vale tambem
+       em "Reconectando" no meio de uma coleta (ver collectMode). Fora da
+       coleta e o contrario: some o Parar e o Iniciar ocupa a linha toda */
+    body:not(.coll-mode) #btnStop,
+    body.coll-mode #btnStart,
+    body.coll-mode #shareRow,
+    body.coll-mode #historyBox,
+    body.coll-mode #advancedBox { display: none; }
     .hint {
       background: #2a2a2a;
       border-radius: 8px;
@@ -567,7 +575,7 @@
 
   <button class="btn btn-primary" id="btnConnect">Conectar via Bluetooth</button>
 
-  <div class="btn-row">
+  <div class="btn-row btn-row-auto">
     <button class="btn btn-success" id="btnStart"  disabled>Iniciar coleta</button>
     <button class="btn btn-warning" id="btnStop"   disabled>Parar coleta</button>
   </div>
@@ -576,7 +584,7 @@
 
   <!-- O log baixa sozinho ao parar a coleta (ou ao conectar com coleta
        encerrada). "Baixar de novo" so aparece se o download falhar. -->
-  <div class="btn-row btn-row-share">
+  <div class="btn-row btn-row-auto" id="shareRow">
     <button class="btn btn-primary" id="btnDownloadBle" hidden>Baixar de novo</button>
     <button class="btn btn-primary" id="btnShare" disabled>Compartilhar</button>
   </div>
@@ -607,7 +615,7 @@
     <div class="history-list" id="historyList"></div>
   </details>
 
-  <details>
+  <details id="advancedBox">
     <summary>Avancado</summary>
 
     <p style="margin-top: 0.75rem; font-size: 0.85rem; color: #adb5bd;">
@@ -628,7 +636,7 @@
     <div class="log" id="log"></div>
   </details>
 
-  <p class="footer">v21 &middot; historico das ultimas 20 coletas &middot; Chrome/Edge no Android</p>
+  <p class="footer">v22 &middot; tela de coleta enxuta &middot; Chrome/Edge no Android</p>
 
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
@@ -720,6 +728,7 @@
     const SPARK_MA_WINDOW = 10;     // janela menor pra MA ao vivo (responsiva)
     let liveSamples = [];           // [{ t, bar, temp }]
     let lastSeenState = '';
+    let collectMode   = false;      // tela de coleta enxuta (classe coll-mode no body)
 
     function logLine(msg, cls) {
       const el = document.createElement('div');
@@ -970,7 +979,11 @@
         .replace(/\s*p=-?\d+\.\d+/, '')
         .replace(/\s*t=-?\d+\.\d+/, '');
 
-      $('statusValue').textContent = visibleText;
+      // READY: na tela fica so "READY". O n= continua em lastSeenState porque
+      // identifica a coleta (download automatico e historico).
+      $('statusValue').textContent = visibleText.startsWith('READY')
+        ? visibleText.replace(/\s*n=\d+/, '')
+        : visibleText;
       updateBattery(batteryMv);
 
       // Detecta entrada em COLL pra resetar sparkline
@@ -979,6 +992,13 @@
       if (isColl && !wasColl) clearLiveSamples();
       if (!isColl && wasColl) clearLiveSamples();
       lastSeenState = visibleText;
+
+      // Tela de coleta enxuta: COLL liga; IDLE/READY/WIFI/Desconectado desliga.
+      // "Reconectando" mantem o que estava: no meio de uma coleta o trado desce
+      // e a conexao cai, e a tela nao deve se encher de botoes por isso.
+      if (isColl) collectMode = true;
+      else if (visibleText !== 'Reconectando') collectMode = false;
+      document.body.classList.toggle('coll-mode', collectMode);
 
       // Coleta nova: grafico e log da coleta anterior saem da tela.
       // Coleta encerrada com o app olhando (Parar ou auto-stop): baixa sozinho.
@@ -1019,7 +1039,8 @@
           visibleText === 'Reconectando') {
         sessionStartedAt = null;
       }
-      if (sessionStartedAt) {
+      // "Iniciada as" so durante a coleta; depois de parar nao acrescenta nada
+      if (sessionStartedAt && collectMode) {
         $('statusStarted').hidden = false;
         $('statusStarted').textContent =
           'Iniciada as ' + sessionStartedAt.toLocaleTimeString('pt-BR');
