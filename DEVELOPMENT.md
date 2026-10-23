@@ -378,7 +378,7 @@ A PWA é servida pelo **GitHub Pages** a partir de `/docs` no repo. Atualizar a 
 
 1. Editar `docs/index.html`, `docs/sw.js`, etc.
 2. **Bumpar** `CACHE` em `sw.js` (ex.: `loggerp-pwa-v11` → `loggerp-pwa-v12`).
-3. **Bumpar** o footer no `index.html` (ex.: `v11 · ...`).
+3. **Bumpar** a versão no subtítulo do `index.html` (`<span class="app-version">vN</span>`, mesmo número do `CACHE`). Não há mais rodapé.
 4. `git commit && git push origin main`.
 5. GitHub Pages publica em ~30-60 s.
 
@@ -500,7 +500,7 @@ esp_pm_configure(&pm);
    - Primeiro chunk → `streamTotal = mv` (4 bytes LE).
    - Demais → `streamChunks.push(chunk)`, atualiza progresso.
    - Quando `streamReceived >= streamTotal` → `finishStream()`.
-5. `finishStream()` monta `Blob` + `File`, guarda em `localLog` e renderiza o gráfico. **Não** compartilha: o botão **Compartilhar** chama `shareLocalLog()` → `navigator.share({files})` direto no toque (o Chrome exige gesto do usuário recente; depois de um download de vários segundos o share falhava).
+5. `finishStream()` guarda o log em `localLog`, renderiza o gráfico e grava no histórico (13.7). **Não** compartilha: o compartilhamento é pelo ícone do histórico → `shareFile()` → `navigator.share({files})` direto no toque (o Chrome exige gesto do usuário recente; depois de um download de vários segundos o share falhava). O botão **Compartilhar** da tela inicial (`#btnShare` → `shareLocalLog()`) é só reserva: aparece se `!historyEnabled` ou se a gravação no histórico falhou (`historySaveFailed`); `#shareRow` some quando não há botão visível nele.
 6. Watchdog de 15 s entre chunks. Falha (sem resposta, timeout, header inválido, queda de conexão) → `failDownload()` → `downloadFailed = true` → aparece **Baixar de novo**.
 
 ### 13.4 Gráfico SVG

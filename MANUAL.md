@@ -64,6 +64,8 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 ![Tela do app SCPT durante uma coleta](img/pwa-coleta.png)
 
+**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v24`). Informe a versão ao relatar algum problema.
+
 **Card "Estado"** (de cima para baixo):
 - **Bateria**, no canto superior direito: percentual e tensão. Ao lado fica o botão de **números grandes**, que alterna para uma visão só com pressão e temperatura em fonte grande (para ler de longe).
 - **Estado e contador de amostras**: por exemplo `COLL 1Hz n=1535` (coletando a 1 Hz, 1535 leituras gravadas).
@@ -76,7 +78,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 - **Conectar via Bluetooth**: depois de conectado, mostra `Conectado: LoggerP_C3`.
 - **Iniciar coleta** (verde): aparece fora da coleta. **Parar coleta** (amarelo): aparece só durante a coleta.
 - **Marcar Evento** (laranja): só aparece durante a coleta (ver 7.4).
-- **Compartilhar** (azul): envia o log da última coleta, que o app baixa sozinho ao parar a coleta (ver 7.6). Se o download falhar, aparece ao lado o botão **Baixar de novo**.
+- **Baixar de novo** (azul): só aparece se o download automático do log falhar (ver 7.6). Para compartilhar uma coleta, use o **Historico** (ver 7.6 e 7.10).
 - **Historico (N)**: lista recolhida com as últimas 20 coletas baixadas, guardadas no celular (ver 7.10).
 - **Avançado**: menu recolhido com as funções menos usadas (apagar log, download via Wi-Fi etc.).
 
@@ -114,7 +116,7 @@ Aparecem também:
 - **"Iniciada às HH:MM:SS"** — horário do celular em que você iniciou.
 - **"Auto-stop em H:MM:SS"** — quanto tempo falta para o auto-stop de 2 horas.
 
-Durante a coleta a tela fica só com **Parar coleta** e **Marcar Evento**. Iniciar coleta, Compartilhar, Historico e Avançado somem e voltam quando a coleta para — inclusive se a conexão cair no meio ("Reconectando..."), a tela continua enxuta.
+Durante a coleta a tela fica só com **Parar coleta** e **Marcar Evento**. Iniciar coleta, Historico e Avançado somem e voltam quando a coleta para — inclusive se a conexão cair no meio ("Reconectando..."), a tela continua enxuta.
 
 ### 7.3 Durante a coleta
 
@@ -154,16 +156,17 @@ Se a coleta parar sozinha com o celular conectado, o download também é automá
 
 ### 7.6 Compartilhar o log
 
-Depois que o log foi baixado (automático ao parar a coleta, ver 7.5), toque em **"Compartilhar"** (botão azul).
+Depois que o log foi baixado (automático ao parar a coleta, ver 7.5), a coleta aparece na **primeira linha do Historico** (ver 7.10).
 
-1. O **menu de compartilhamento do Android** abre.
-2. Escolha **WhatsApp**, e-mail ou qualquer app para enviar o `log.csv`.
+1. Toque em **"Historico"** para abrir a lista.
+2. Na primeira linha (a coleta que acabou de terminar), toque no **ícone de compartilhar** (azul).
+3. O **menu de compartilhamento do Android** abre: escolha **WhatsApp**, e-mail ou qualquer app para enviar o `log.csv`.
 
 O nome do arquivo já vem com a data/hora do download: `log_2026-05-10_14-32-01.csv`.
 
-**Se o download falhar** (Bluetooth caiu, equipamento longe), o app avisa e aparece o botão **"Baixar de novo"** ao lado do Compartilhar. Aproxime o celular e toque nele. Se a conexão cair no meio do download, o app tenta de novo sozinho quando reconectar.
+**Se o download falhar** (Bluetooth caiu, equipamento longe), o app avisa e aparece o botão **"Baixar de novo"**. Aproxime o celular e toque nele. Se a conexão cair no meio do download, o app tenta de novo sozinho quando reconectar.
 
-O botão **Compartilhar** envia sempre a última coleta, até a próxima **"Iniciar coleta"**. Se o app for fechado, ele baixa de novo do equipamento na próxima conexão. Toda coleta baixada também fica no **Histórico** (ver 7.10), de onde pode ser compartilhada depois.
+Se o app não conseguir guardar a coleta no Historico (por exemplo, celular sem espaço), aparece na tela inicial um botão **"Compartilhar"** para enviar essa última coleta.
 
 ### 7.7 Ver gráfico
 
