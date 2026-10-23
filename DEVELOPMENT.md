@@ -489,7 +489,7 @@ esp_pm_configure(&pm);
 
 ### 13.3 Streaming do CSV
 
-**Quando baixa:** sozinho, ao ver `COLL → READY` (Parar coleta ou auto-stop com o app conectado) e ao conectar com o logger em `READY` numa coleta que o celular ainda não tem — `autoDownloadArmed` + `maybeAutoDownload()`, comparando o `n=` do `READY` com o do log guardado (`localLog.n`). Manualmente, pelo botão **Baixar de novo**, que só aparece depois de uma falha (`downloadFailed`). `Iniciar coleta` e a entrada em `COLL` chamam `clearSessionLog()` (some gráfico e log).
+**Quando baixa:** sozinho, ao ver `COLL → READY` (Parar coleta ou auto-stop com o app conectado) e ao conectar com o logger em `READY` numa coleta que o celular ainda não tem — `autoDownloadArmed` + `maybeAutoDownload()`, comparando o `n=` do `READY` com o do log guardado (`localLog.n`). Manualmente, pelo botão **Baixar de novo**, que só aparece depois de uma falha (`downloadFailed`). O motivo vai em `autoDownloadArmed` / `downloadReason` (`'stop'`, `'connect'`, `'manual'`): só o `'connect'` é silencioso — não abre o gráfico e não mostra "Log baixado"; se `saveToHistory()` disser que a coleta é nova, mostra "Coleta do equipamento guardada no Historico" (v26). `Iniciar coleta` e a entrada em `COLL` chamam `clearSessionLog()` (some gráfico e log).
 
 `startBleDownload()`:
 

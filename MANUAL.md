@@ -152,7 +152,7 @@ Alternativamente, a coleta para automaticamente:
 - Após **2 horas** (limite máximo de sessão).
 - Quando a bateria descarrega.
 
-Se a coleta parar sozinha com o celular conectado, o download também é automático. Se o celular estava longe ou o app foi fechado, o app baixa o log assim que conectar de novo ao equipamento.
+Se a coleta parar sozinha com o celular conectado, o download também é automático. Se o celular estava longe ou o app foi fechado, o app baixa o log assim que conectar de novo ao equipamento — **sem abrir o gráfico**: se for uma coleta que ainda não estava no celular, aparece o aviso **"Coleta do equipamento guardada no Historico"** e ela entra no Historico (ver 7.10), de onde se abre o gráfico. Se a coleta já estava no Historico, o download é silencioso (só a barra de progresso por alguns segundos).
 
 ### 7.6 Compartilhar o log
 
