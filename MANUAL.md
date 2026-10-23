@@ -177,7 +177,7 @@ Assim que o log é baixado (ao parar a coleta), o gráfico aparece abaixo dos bo
 - **Linha cinza:** temperatura (°C, média dos últimos ~6 s — ver 8), eixo Y secundário à direita
 - **Bolinha vermelha:** pico de pressão da sessão, com o valor numérico
 - **Linhas verticais tracejadas coloridas:** anotações de "Marcar Evento" (ver 7.4) — azul para perfuração, verde para concretagem, cinza para outras
-- **Info:** total de amostras, pico (com tempo), duração, contagem de anotações, média/mediana/desvio padrão da pressão, temperatura inicial→final com ΔT
+- **Info:** total de amostras, pico (com tempo), duração, contagem de anotações, pressão mínima e máxima, temperatura inicial→final com ΔT, e a legenda das linhas (pressão, média, temp)
 
 **Gestos no gráfico:**
 - **Pinça** com 2 dedos: zoom no eixo de tempo

@@ -507,10 +507,10 @@ esp_pm_configure(&pm);
 
 Renderização inline em SVG (sem biblioteca externa). Componentes:
 
-- **`parseCsvBytes(bytes)`**: parser do CSV → `{points, ma, pMax, pMaxIdx, pMin, pMean, pMedian, pStd, tMin, tMax, hasTemp, tInit, tFinal, tAxisMin, tAxisMax, notes}`. Tolerante a CSV de 3 colunas (sem temp) e de 3 ou 4 colunas (sem nota).
+- **`parseCsvBytes(bytes)`**: parser do CSV → `{points, ma, pMax, pMaxIdx, pMin, tMin, tMax, hasTemp, tInit, tFinal, tAxisMin, tAxisMax, notes}`. Tolerante a CSV de 3 colunas (sem temp) e de 3 ou 4 colunas (sem nota).
 - **`computeMA(points, window)`**: média móvel com janela crescente nas primeiras 49 amostras.
 - **`drawChart()`**: SVG com grid, axes, linha azul (pressão), linha laranja (MA), linha cinza (temperatura), bolinha vermelha do pico, labels, e marcadores verticais de anotação (linha tracejada + label rotacionado 90°, cor por categoria: azul=perfuração, verde=concretagem, cinza=outra). Marcadores respeitam pan/zoom.
-- Estatísticas (média, mediana, σ, min, max, pico@tempo, ΔT) e contagem de anotações renderizadas no `chartInfo` abaixo do header.
+- Resumo no `chartInfo` abaixo do header: amostras, pico@tempo, duração, anotações; min/max da pressão; temperatura inicial→final com ΔT; e a legenda numa linha só (`.chart-legend`, `white-space: nowrap`, "temp" abreviado — cabe até em 320 px). Média, mediana e σ foram retirados na v25.
 
 ### 13.5 Pinch zoom
 
