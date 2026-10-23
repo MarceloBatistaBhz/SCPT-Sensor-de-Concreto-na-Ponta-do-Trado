@@ -79,7 +79,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 - **Iniciar coleta** (verde): aparece fora da coleta. **Parar coleta** (amarelo): aparece só durante a coleta.
 - **Marcar Evento** (laranja): só aparece durante a coleta (ver 7.4).
 - **Baixar de novo** (azul): só aparece se o download automático do log falhar (ver 7.6). Para compartilhar uma coleta, use o **Historico** (ver 7.6 e 7.10).
-- **Historico (N)**: lista recolhida com as últimas 20 coletas baixadas, guardadas no celular (ver 7.10).
+- **Historico (N)**: lista recolhida com as últimas 20 coletas baixadas, guardadas no celular, com uma lixeira à direita para apagar o histórico inteiro (ver 7.10).
 - **Avançado**: menu recolhido com as funções menos usadas (apagar log, download via Wi-Fi etc.).
 
 **Cores do card Estado:**
@@ -212,6 +212,8 @@ Toque em **"Historico (N)"** para abrir a lista. Cada coleta ocupa uma linha com
 
 O histórico funciona **sem conexão** com o equipamento e sem internet.
 
+**Apagar o histórico (ex.: começar uma obra nova):** toque na **lixeira vermelha**, à direita de "Historico (N)", e confirme. Todas as coletas do histórico são apagadas — não dá para apagar só uma, nem desfazer. A última coleta da obra anterior continua guardada no equipamento até o próximo "Iniciar coleta", mas **não volta** para o histórico quando o app conectar de novo. Antes de apagar, compartilhe as coletas que precisar guardar.
+
 > ⚠️ O histórico fica **dentro do app**. Desinstalar o app ou usar "Limpar dados" nas configurações do Android apaga o histórico. Compartilhe as coletas importantes.
 
 ---
@@ -282,7 +284,7 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 | Indicador de bateria sumiu | Pode ser desconexão recente | Aguarde uns segundos; aparece novamente quando o status atualiza |
 | Após queda de energia, aparece `READY` no boot | Sessão anterior interrompida | Os dados gravados estão preservados. Ao conectar, o app baixa o log sozinho; compartilhe antes de um novo "Iniciar coleta" |
 | Equipamento parou de gravar antes de 2 h | Bateria acabou | Recarregue. Os dados gravados estão preservados |
-| Histórico sumiu ou ficou vazio | App desinstalado, ou dados do app limpos nas configurações do Android | Não há como recuperar no celular. As coletas compartilhadas continuam onde foram enviadas, e a última coleta continua no equipamento até o próximo "Iniciar coleta" |
+| Histórico sumiu ou ficou vazio | Histórico apagado pela lixeira, app desinstalado, ou dados do app limpos nas configurações do Android | Não há como recuperar no celular. As coletas compartilhadas continuam onde foram enviadas, e a última coleta continua no equipamento até o próximo "Iniciar coleta" |
 
 ### Forçar reset do equipamento
 

@@ -541,6 +541,7 @@ Banco `scpt-historico`, store `logs` (`keyPath: 'id'`, índice `savedAt`). Cada 
 - **Persistência:** `navigator.storage.persist()` a cada gravação, para o Chrome não despejar o banco com o celular sem espaço (com o app instalado costuma ser concedido; não é garantido).
 - **UI:** `loadHistory()` na abertura do app e após cada gravação; `renderHistoryList()` monta o `<details id="historyBox">` com **uma linha por coleta** (`dd/mm hh:mm · duração · pico bar`, `white-space: nowrap` + reticências) e dois botões de ícone SVG inline (`historyIconButton()`, `ICON_CHART`/`ICON_SHARE`, 40×36 px): gráfico → `renderChart(bytes, 'Grafico de dd/mm hh:mm')`, compartilhar → `shareFile(bytes, fname)`. A palavra "pico" ficou de fora para caber em celular de 360 px (sobram ~200 px para o texto). Não depende de conexão BLE.
 - Sem `indexedDB` ou `crypto.subtle` (`historyEnabled = false`), o bloco fica escondido.
+- **Apagar tudo (v27):** lixeira no `<summary>` do histórico (`#btnClearHistory`, só aparece com itens; `preventDefault`/`stopPropagation` para não abrir/fechar a lista) → `confirm()` → `clearHistory()` limpa o store, fecha o gráfico e recarrega a lista. Os `id` apagados vão para `localStorage['scpt-historico-apagadas']` (até 200) e `saveToHistory()` os recusa: sem isso, o último log da obra anterior, que segue no equipamento, voltaria ao histórico no download automático ao conectar. Não há apagar item a item (decisão do usuário).
 
 ### 13.8 Tela de coleta enxuta
 
