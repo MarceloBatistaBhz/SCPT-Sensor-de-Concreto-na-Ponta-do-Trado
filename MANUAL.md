@@ -64,7 +64,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 ![Tela do app SCPT durante uma coleta](img/pwa-coleta.png)
 
-**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v31`). Informe a versão ao relatar algum problema.
+**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v32`). Informe a versão ao relatar algum problema.
 
 **No tablet** a tela é a mesma, na mesma ordem, mas ocupa a largura toda e mostra tudo maior: textos, botões, valores ao vivo e gráfico. Durante a coleta, a **pressão ao vivo** aparece também em tamanho bem grande, à direita no card Estado (só o número, ex.: `0.7`), para ler de longe. O app se ajusta sozinho ao tamanho da tela e fica sempre em pé (retrato).
 
@@ -81,7 +81,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 **Abaixo do card** (durante a coleta a tela fica enxuta: só **Parar coleta** e **Marcar Evento**; os demais botões voltam ao parar):
 - **Conectar via Bluetooth**: só aparece quando o app não está conectado. Se a conexão cair fora de uma coleta, ele vira **Cancelar reconexao** (para parar as tentativas); durante a coleta ele não aparece.
 - **Iniciar coleta** (verde): aparece fora da coleta. **Parar coleta** (amarelo): aparece só durante a coleta.
-- **Marcar Evento** (laranja): só aparece durante a coleta (ver 7.4).
+- **Marcar Evento** (laranja): aparece durante a coleta, com ou sem conexão (ver 7.4). Sem conexão, mostra quantas anotações estão guardadas no celular, ex.: "Marcar Evento (2 no celular)".
 - **Baixar de novo** (azul): só aparece se o download automático do log falhar (ver 7.6). Para compartilhar uma coleta, use o **Historico** (ver 7.6 e 7.10).
 - **Historico (N)**: lista recolhida com as últimas 20 coletas baixadas, guardadas no celular, com uma lixeira à direita para apagar o histórico inteiro (ver 7.10).
 - **Avançado**: menu recolhido com as funções menos usadas (apagar log, download via Wi-Fi etc.).
@@ -137,7 +137,7 @@ A taxa alterna automaticamente entre 1 Hz (regime estável) e 5 Hz (variações 
 
 ### 7.4 Marcar Evento (anotações na timeline)
 
-Durante a coleta, aparece o botão **"Marcar Evento"** (laranja). Toque para abrir um modal com 5 opções fixas:
+Durante a coleta, aparece o botão **"Marcar Evento"** (laranja) — **com ou sem conexão** com o equipamento. Toque para abrir um modal com 5 opções fixas:
 
 | Opção | Cor | Quando usar |
 |---|---|---|
@@ -147,9 +147,16 @@ Durante a coleta, aparece o botão **"Marcar Evento"** (laranja). Toque para abr
 | Fim concretagem | Verde | Concretagem encerrada |
 | Outra situacao | Cinza | Evento não previsto (anote depois no relatório) |
 
-Toque na opção desejada → toast confirma "Marcado: ..." → o modal fecha.
+Toque na opção desejada → o modal fecha e um aviso confirma:
+- **"Marcado: ..."** — com conexão: a anotação foi para o equipamento.
+- **"Guardado no celular: ..."** — sem conexão (card em "Reconectando", trado no furo): a anotação fica guardada no celular com o horário do toque. O botão passa a mostrar quantas estão guardadas, ex.: **"Marcar Evento (2 no celular)"**.
 
-**O que acontece:** a próxima amostra registrada no CSV vai ter o texto da anotação na **4ª coluna**. No gráfico final, aparece uma linha vertical tracejada na cor da categoria com o texto rotacionado ao lado.
+**O que acontece:** a amostra registrada logo depois do toque vai ter o texto da anotação na **4ª coluna** do CSV. No gráfico final, aparece uma linha vertical tracejada na cor da categoria com o texto rotacionado ao lado.
+
+**Anotações sem conexão:** ao baixar o log (no "Parar coleta" ou ao reconectar), o app escreve cada anotação guardada na amostra logo depois do horário do toque — o aviso diz "Log baixado (...), com N evento(s) do celular". O resultado é o mesmo das anotações feitas com conexão: aparecem no CSV, no gráfico, no Histórico e no arquivo compartilhado. Não importa se a coleta estava em 1 Hz ou 5 Hz: cada linha do CSV tem o tempo exato desde o início (coluna `ms`), e o app sabe a que horas a coleta começou. A precisão é de ~0,2 s. Cuidados:
+- **Baixe o log com o mesmo celular** que marcou as anotações (elas ficam só nele).
+- Elas ficam guardadas mesmo se o app for fechado ou o celular reiniciar no meio da coleta; ao reabrir, o botão "Marcar Evento" continua disponível. Só são descartadas no próximo "Iniciar coleta".
+- O download via Wi-Fi (Avançado, 7.9) entrega o arquivo do equipamento sem as anotações guardadas no celular.
 
 **Atraso entre o toque e a gravação:** ≤ 1 segundo em 1 Hz, ≤ 200 ms em 5 Hz. Para registrar eventos com precisão fina, toque um pouco antes do momento exato.
 
@@ -265,7 +272,7 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 - O timestamp é **relativo ao início da sessão**. O app mostra o horário do celular em que a sessão começou; some `ms / 1000` segundos a esse horário para datar leituras específicas.
 - Em modo 1 Hz, o intervalo entre linhas é ~1000 ms. Em modo 5 Hz, ~200 ms. A transição é visível no espaçamento dos timestamps.
 - O sensor está configurado em **modo gauge** — em pressão atmosférica a leitura fica próxima de 0 (com pequeno ruído residual de ~±0,1 bar, dentro da precisão do sensor).
-- A anotação fica atrelada à **próxima amostra após o toque** no botão "Marcar Evento", então pode haver até 1 segundo de defasagem em modo 1 Hz.
+- A anotação fica atrelada à **próxima amostra após o toque** no botão "Marcar Evento" (com ou sem conexão — ver 7.4), então pode haver até 1 segundo de defasagem em modo 1 Hz.
 
 ---
 
@@ -364,13 +371,15 @@ Se o app SCPT estiver indisponível ou para depuração, o equipamento pode ser 
 
 ```
 IDLE b=4050
-COLL 1Hz n=42 r=7158 b=4015
-READY n=14400 b=3920
+COLL 1Hz n=42 r=7158 p=2.8 t=24.6 e=42137 b=4015
+READY n=14400 e=7215532 b=3920
 WIFI 192.168.4.1 b=3895
 ```
 
 - `b=NNNN` = tensão da bateria em mV (sempre presente)
 - `r=NNN` = segundos restantes até auto-stop (apenas em COLL)
+- `p=B.B t=T.T` = última pressão (bar) e temperatura (°C) (apenas em COLL)
+- `e=NNN` = milissegundos desde o início da coleta, a mesma base da coluna `ms` do CSV (em COLL, e em READY se o equipamento não reiniciou desde a coleta)
 - `s=0` = sensor sem resposta (só aparece quando falta o sensor, ex.: `IDLE s=0 b=4050`)
 
 ---

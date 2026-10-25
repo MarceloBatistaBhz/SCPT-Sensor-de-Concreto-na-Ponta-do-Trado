@@ -249,14 +249,15 @@ Comandos inválidos no estado atual são silenciosamente ignorados (apenas logad
 
 Lista fechada — operador escolhe na PWA (botões coloridos), evita digitação em campo. Sem acentos, pra evitar bytes UTF-8 multibyte indo pro arquivo. A tabela está duplicada em dois lugares: `noteTextFromTag()` no firmware e `NOTE_LABELS` em `docs/index.html`. **Mantenha sincronizadas.**
 
-A nota fica em `pendingNote` (RAM) e é gravada **na próxima amostra** (piggyback), depois zera. Atraso: ≤1 s em 1 Hz, ≤200 ms em 5 Hz. Se BLE cair entre o comando e a próxima amostra, a nota é perdida — trade-off em troca de simplicidade (nada persistido em flash).
+A nota fica em `pendingNote` (RAM) e é gravada **na próxima amostra** (piggyback), depois zera. Atraso: ≤1 s em 1 Hz, ≤200 ms em 5 Hz. Se o `NOTE` não for confirmado (BLE caiu), a PWA trata a nota como marcada sem conexão (13.13).
 
 ### 5.3 Formato do `status` (notify)
 
-String ASCII de até ~50 bytes (buffer de 64). Estrutura: `<estado-base> [<sub-info>...]`. Campos opcionais:
+String ASCII de até ~60 bytes (buffer de 72). Estrutura: `<estado-base> [<sub-info>...]`. Campos opcionais:
 
 - `r=NNN` — segundos restantes até auto-stop (apenas em COLL)
 - `p=B.B t=T.T` — última leitura de pressão (com TARE) e temperatura (apenas em COLL)
+- `e=MS` — ms desde o início da coleta, mesma base da coluna `ms` do CSV (em COLL; em READY só se a coleta foi nesta partida — `sessionThisBoot`, porque o `millis()` recomeça no reset). A PWA usa para saber a hora do início no relógio do celular (13.13)
 - `s=0` — sensor sem resposta (em qualquer estado; ausente quando o sensor responde). Ver 6.2
 - `b=NNNN` — tensão da bateria em mV (em qualquer estado, se a leitura for válida)
 
@@ -266,9 +267,10 @@ String ASCII de até ~50 bytes (buffer de 64). Estrutura: `<estado-base> [<sub-i
 IDLE b=4050
 IDLE s=0 b=4050
 COLL 1Hz n=1234 r=6800 b=4015
-COLL 1Hz n=1234 r=6797 p=2.8 t=24.6 s=0 b=4015
-COLL 5Hz n=2500 r=6500 b=4010
-READY n=14400 b=3920
+COLL 1Hz n=1234 r=6797 p=2.8 t=24.6 e=403112 s=0 b=4015
+COLL 5Hz n=2500 r=6500 p=3.1 t=24.7 e=700020 b=4010
+READY n=14400 e=7215532 b=3920
+READY n=0 b=3920                    (log de antes de um reset: sem e=)
 WIFI 192.168.4.1 b=3895
 ```
 
@@ -587,6 +589,16 @@ O botão `#btnConnect` não mostra mais "Conectado: LoggerP_C3": `setConnectedUi
 ### 13.12 Botão MANUAL (v31)
 
 `<a class="btn btn-manual" id="btnManual" href="MANUAL.pdf" target="_blank">` depois do `#advancedBox`: 25% da largura, vermelho (`#ff6b6b`) com texto preto. O `body` já é coluna flex com `min-height: 100vh/100dvh`, então `margin-top: auto` + `align-self: flex-start` deixam o botão no canto inferior esquerdo quando a página é curta, e no fim da página (sem cobrir nada) com histórico/gráfico abertos. Some em `coll-mode`. No Android o PDF abre no leitor do Chrome (ou no app de PDF padrão, conforme o aparelho); offline vem do `scpt-manual` (13.6).
+
+### 13.13 Eventos marcados sem conexão (v32)
+
+O equipamento passa ~95% da coleta sem conexão (desce no furo; a conexão cai a 1–2 m de profundidade). O "Marcar Evento" fica disponível com `collectMode || sessEv.active` — inclusive em "Reconectando" e com o app reaberto sem conexão.
+
+- **`sessEv`** (localStorage `scpt-eventos`): `{ startMs, active, events: [{ t, tag, sent }] }`. Todo evento entra aqui com `Date.now()`; com conexão vai também como `NOTE n` e, se a escrita for confirmada, fica `sent: true`. `active` vira `true` com COLL e `false` com IDLE/READY/WIFI (Reconectando/Desconectado não mexem).
+- **Relógio comum:** cada status com `e=` dá uma estimativa do início, `Date.now() - e`. `syncSessionStart()` guarda a **menor** (o atraso do BLE só atrasa a estimativa; ~50 ms no simulador com 20–150 ms de atraso). Estimativa a mais de `SAME_SESSION_MS` (5 s) da guardada = outra coleta: troca o início e descarta os eventos de antes dele. Por isso os eventos só somem no próximo START.
+- **No download** (`finishStream()` → `mergePhoneEvents()`): cada evento não enviado vira `rel = t - startMs` e o texto de `NOTE_LABELS` vai para a coluna `note` da 1ª amostra com `ms >= rel` (a última, se o toque foi depois dela), pulando amostras que já têm nota. Eventos fora de `[-5 s, último ms + 60 s]` são ignorados (log de outra coleta). Como a taxa (1/5 Hz) já está no `ms` de cada linha, não precisa de mais nada. Mesmo log + mesmos eventos = mesmos bytes → mesmo SHA-256 → "Baixar de novo" não duplica no histórico.
+- O botão mostra `Marcar Evento (N no celular)` com N = eventos não enviados (contador some com a coleta).
+- Limitações: o log precisa ser baixado pelo celular que marcou; o download via Wi-Fi não passa pelo merge; limpar os dados do app perde os eventos ainda não baixados.
 
 ---
 
