@@ -53,6 +53,17 @@
     .status-card.serving   { border-left-color: #cc5de8; }
     .status-card.discon    { border-left-color: #ff6b6b; }
     .status-card.reconn    { border-left-color: #ffa94d; animation: pulse 1.4s ease-in-out infinite; }
+    /* Sensor sem resposta (" s=0" no status): borda e aviso vermelhos. Na
+       coleta os valores ao vivo ficam apagados: sao a ultima leitura boa. */
+    .status-card.sensor-bad { border-left-color: #ff6b6b; }
+    .status-alert {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #ff6b6b;
+      margin-top: 0.35rem;
+    }
+    .status-card.sensor-bad .status-live,
+    .status-card.sensor-bad .status-bigp { opacity: 0.35; }
     @keyframes pulse {
       0%, 100% { border-left-color: #ffa94d; }
       50%      { border-left-color: #ff922b; }
@@ -542,6 +553,7 @@
     .status-sparkline:not([hidden]),
     .status-countdown:not([hidden]),
     .status-started:not([hidden]),
+    .status-alert:not([hidden]),
     .status-battery:not([hidden]),
     .big-toggle:not([hidden]) {
       animation: fadeIn 1.4s ease-out;
@@ -634,7 +646,7 @@
 </head>
 <body>
   <!-- Versao do app: bumpar junto com CACHE em sw.js -->
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v29</span></span></h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v30</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
@@ -658,6 +670,7 @@
     <div class="status-mid">
       <div class="status-texts">
         <div class="status-value" id="statusValue">Desconectado</div>
+        <div class="status-alert" id="statusSensor" hidden></div>
         <div class="status-live" id="statusLive" hidden></div>
         <div class="status-started" id="statusStarted" hidden></div>
         <div class="status-countdown" id="statusCountdown" hidden></div>
@@ -840,6 +853,7 @@
     let liveSamples = [];           // [{ t, bar, temp }]
     let lastSeenState = '';
     let collectMode   = false;      // tela de coleta enxuta (classe coll-mode no body)
+    let sensorMissing = false;      // status com " s=0": sensor nao responde
 
     function logLine(msg, cls) {
       const el = document.createElement('div');
@@ -1084,11 +1098,13 @@
       const batteryMv  = matchB ? parseInt(matchB[1], 10) : null;
       const livePres   = matchP ? parseFloat(matchP[1])    : null;
       const liveTemp   = matchT ? parseFloat(matchT[1])    : null;
+      const sensorBad  = /\ss=0\b/.test(text);
       const visibleText = text
         .replace(/\s*r=\d+/, '')
         .replace(/\s*b=\d+/, '')
         .replace(/\s*p=-?\d+\.\d+/, '')
-        .replace(/\s*t=-?\d+\.\d+/, '');
+        .replace(/\s*t=-?\d+\.\d+/, '')
+        .replace(/\ss=0\b/, '');
 
       // READY: na tela fica so "READY". O n= continua em lastSeenState porque
       // identifica a coleta (download automatico e historico).
@@ -1124,7 +1140,8 @@
           '<span class="lv-p">' + livePres.toFixed(1) + ' bar</span>' +
           '<span class="lv-sep"> &middot; </span>' +
           '<span class="lv-t">' + liveTemp.toFixed(1) + ' &deg;C</span>';
-        pushLiveSample(livePres, liveTemp);
+        // Sem sensor o p=/t= e a ultima leitura boa repetida: fora do grafico
+        if (!sensorBad) pushLiveSample(livePres, liveTemp);
         // Numero gigante: o CSS so mostra no tablet (ver .status-bigp)
         $('statusBigPVal').textContent = livePres.toFixed(1);
         $('statusBigP').hidden = false;
@@ -1174,6 +1191,19 @@
       // Troca so as classes de estado, preserva big-mode etc.
       card.classList.remove('idle', 'collect', 'ready', 'serving', 'discon', 'reconn');
       card.classList.add(cls);
+
+      // Sensor sem resposta: aviso fixo no card. Na coleta tambem um toast
+      // quando cai e quando volta, porque o operador nao fica olhando o card.
+      const wasSensorMissing = sensorMissing;
+      sensorMissing = sensorBad;
+      card.classList.toggle('sensor-bad', sensorMissing);
+      $('statusSensor').hidden = !sensorMissing;
+      $('statusSensor').textContent = isColl ? '⚠ Sensor sem resposta' : '⚠ Sensor nao detectado';
+      if (isColl && sensorMissing && !wasSensorMissing) {
+        showToast('Sensor sem resposta. Confira o cabo do sensor.', 'error', 5000);
+      } else if (isColl && !sensorMissing && wasSensorMissing) {
+        showToast('Sensor respondendo de novo', 'success', 2500);
+      }
       // Pulse one-shot quando entra em COLL (1.9s de animacao)
       if (isColl && !wasColl) {
         card.classList.remove('coll-enter');
@@ -2197,6 +2227,10 @@
     let tareInProgress = false;
     async function performTareAndStart() {
       if (tareInProgress) return;
+      if (sensorMissing) {
+        showToast('Sensor nao detectado. Confira o cabo do sensor.', 'error', 4000);
+        return;
+      }
       tareInProgress = true;
       clearSessionLog();   // grafico da coleta anterior sai ja no toque
 
@@ -2218,8 +2252,13 @@
       fill.classList.add('fill');   // dispara transicao de 3 s
 
       await new Promise((r) => setTimeout(r, 3000));
-      check.classList.add('visible');
-      await new Promise((r) => setTimeout(r, 700));
+      // Cabo soltou depois da ultima checagem: o firmware nao achou leitura
+      // valida no TARE e mandou " s=0". Sem o tick e sem START.
+      const tareFailed = sensorMissing;
+      if (!tareFailed) {
+        check.classList.add('visible');
+        await new Promise((r) => setTimeout(r, 700));
+      }
 
       // Anima saida do modal antes de esconder de fato (0.5s)
       modal.classList.add('closing');
@@ -2227,10 +2266,22 @@
       modal.hidden = true;
       modal.classList.remove('closing');
       tareInProgress = false;
+      if (tareFailed) {
+        showToast('Sensor nao detectado. Confira o cabo do sensor.', 'error', 4000);
+        return;
+      }
       showToast('Calibracao OK', 'success', 2000);
 
       // Por fim, inicia a coleta de fato
-      sendCmd('START');
+      await sendCmd('START');
+      // O firmware recusa o START sem avisar (sem sensor, falha no arquivo):
+      // se o estado nao virar COLL logo, o operador fica sabendo.
+      setTimeout(() => {
+        if (!cmdChar || lastSeenState.startsWith('COLL')) return;
+        logLine('Coleta nao iniciou (estado ' + lastSeenState + ')', 'err');
+        showToast(sensorMissing ? 'Sensor nao detectado. Confira o cabo do sensor.'
+                                : 'A coleta nao iniciou. Tente de novo.', 'error', 4000);
+      }, 4000);
     }
 
     $('btnStart').onclick       = performTareAndStart;
