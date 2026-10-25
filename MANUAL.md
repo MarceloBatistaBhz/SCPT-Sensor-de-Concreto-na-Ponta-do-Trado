@@ -64,7 +64,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 ![Tela do app SCPT durante uma coleta](img/pwa-coleta.png)
 
-**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v28`). Informe a versão ao relatar algum problema.
+**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v30`). Informe a versão ao relatar algum problema.
 
 **No tablet** a tela é a mesma, na mesma ordem, mas ocupa a largura toda e mostra tudo maior: textos, botões, valores ao vivo e gráfico. Durante a coleta, a **pressão ao vivo** aparece também em tamanho bem grande, à direita no card Estado (só o número, ex.: `0.7`), para ler de longe. O app se ajusta sozinho ao tamanho da tela e fica sempre em pé (retrato).
 
@@ -72,6 +72,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 - **● conectado** (verde), ao lado do rótulo ESTADO: o app está conectado ao equipamento. Desconectado ou reconectando, o próprio estado mostra `Desconectado` ou `Reconectando`.
 - **Bateria**, no canto superior direito: percentual e tensão. Ao lado fica o botão de **números grandes**, que alterna para uma visão só com pressão e temperatura em fonte grande (para ler de longe).
 - **Estado e contador de amostras**: por exemplo `COLL 1Hz n=1535` (coletando a 1 Hz, 1535 leituras gravadas).
+- **⚠ Sensor nao detectado** / **⚠ Sensor sem resposta** (vermelho): o equipamento não está conseguindo ler o sensor de pressão (ver 7.2 e 7.3). Some sozinho quando o sensor volta a responder.
 - **Valores ao vivo**: pressão em bar (azul) e temperatura em °C.
 - **"Iniciada às HH:MM:SS"**: horário do celular em que a coleta começou (só durante a coleta).
 - **"Auto-stop em H:MM:SS"**: quanto falta para a parada automática de 2 horas.
@@ -90,7 +91,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 - 🟡 **Amarelo** = Coletando (COLL)
 - 🟣 **Roxo** = Wi-Fi ligado para download (SERVING)
 - 🟠 **Laranja pulsante** = Reconectando
-- 🔴 **Vermelho** = Desconectado
+- 🔴 **Vermelho** = Desconectado, ou sensor sem resposta (com o aviso ⚠ no card)
 
 **Indicador de bateria:**
 - Verde (>50%): tudo bem
@@ -121,11 +122,17 @@ Aparecem também:
 
 Durante a coleta a tela fica só com **Parar coleta** e **Marcar Evento**. Iniciar coleta, Historico e Avançado somem e voltam quando a coleta para — inclusive se a conexão cair no meio ("Reconectando..."), a tela continua enxuta.
 
+**Sensor não detectado:** o equipamento confere o sensor a cada 2 s enquanto não está coletando. Se o cabo do sensor estiver solto ou desligado, o card Estado mostra **⚠ Sensor nao detectado** (borda vermelha) e o "Iniciar coleta" só mostra um aviso — a coleta não começa. Confira o cabo: quando o sensor volta a responder, o aviso some sozinho em até 2 s, sem precisar desligar o equipamento. Se o cabo soltar durante a calibração, o app fecha a janela "Calibrando sensor" sem o ✓ e avisa.
+
+Se a coleta não começar por outro motivo, o app avisa **"A coleta nao iniciou"** depois de alguns segundos; é só tocar em "Iniciar coleta" de novo.
+
 ### 7.3 Durante a coleta
 
 A taxa alterna automaticamente entre 1 Hz (regime estável) e 5 Hz (variações rápidas). Os dados são gravados em tempo real na flash interna.
 
 **Comportamento de campo (trado descendo):** se o celular sair de alcance (equipamento desce abaixo da superfície), a conexão BLE cai e o card Estado mostra "Reconectando". O equipamento **continua coletando normalmente**. Quando voltar para perto, o app reconecta sozinho em até 4 s.
+
+**Sensor sem resposta (cabo solto ou rompido):** depois de ~3 s sem conseguir ler o sensor, o card Estado mostra **⚠ Sensor sem resposta**, aparece um aviso no topo da tela, a pressão ao vivo fica apagada (é a última leitura boa) e o contador de amostras para de subir. Nesse período **nada é gravado** no log. Se o sensor voltar a responder, a gravação continua sozinha e o app avisa "Sensor respondendo de novo". A parada automática de 2 h vale mesmo sem sensor.
 
 ### 7.4 Marcar Evento (anotações na timeline)
 
@@ -281,7 +288,9 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 |---|---|---|
 | `LoggerP_C3` não aparece ao tocar "Conectar" | Equipamento desligado, fora de alcance, ou Bluetooth/Localização desligados | Confirme bateria, aproxime do celular, ative BT e Localização |
 | Conecta mas estado fica em "Reconectando..." | Distância no limite, ou ruído | Aproxime mais. O app tenta reconectar automaticamente |
-| Estado fica em `COLL 1Hz n=0` sem incrementar | Sensor não respondeu | Conecte ao USB, abra Serial monitor (Arduino IDE) pra ver `[AVISO]` no boot |
+| Card mostra **⚠ Sensor nao detectado** e a coleta não começa | Cabo do sensor solto, desligado ou danificado | Confira o conector e o cabo. O aviso some sozinho em até 2 s quando o sensor responde; não precisa desligar o equipamento |
+| **⚠ Sensor sem resposta** durante a coleta | Cabo soltou ou rompeu no meio da coleta | Nada é gravado enquanto durar. Se o sensor voltar, a gravação continua sozinha; senão pare a coleta e confira o cabo |
+| App avisa **"A coleta nao iniciou"** | O equipamento recusou o início (ex.: falha ao criar o arquivo) | Toque em "Iniciar coleta" de novo. Se repetir, desligue e ligue o equipamento |
 | Download trava na barra de progresso | Link BLE instável | Aguarde 15 s: o app avisa e mostra **"Baixar de novo"**. Aproxime o celular e toque nele; se continuar falhando, use a opção Wi-Fi (Avançado) |
 | Wi-Fi `LoggerP_AP` não aparece após DOWNLOAD | Alguns Androids escondem redes abertas | Adicionar rede manualmente no celular: `LoggerP_AP`, sem senha |
 | Indicador de bateria sumiu | Pode ser desconexão recente | Aguarde uns segundos; aparece novamente quando o status atualiza |
@@ -361,7 +370,8 @@ WIFI 192.168.4.1 b=3895
 
 - `b=NNNN` = tensão da bateria em mV (sempre presente)
 - `r=NNN` = segundos restantes até auto-stop (apenas em COLL)
+- `s=0` = sensor sem resposta (só aparece quando falta o sensor, ex.: `IDLE s=0 b=4050`)
 
 ---
 
-*Última revisão: 2026-10-22*
+*Última revisão: 2026-10-25*

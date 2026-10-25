@@ -183,10 +183,12 @@ Tudo do firmware está em `MedidorSinalBLE.ino`, organizado em blocos:
 | Includes + defines | Configurações, UUIDs, constantes de tempo, `BATTERY_*` |
 | Globais de estado | Variáveis da máquina de estados, contadores, cache de bateria |
 | `struct KellerLD` | Driver inline do sensor (begin, readReg16, readPressure) |
+| `checkSensor/setSensorAlive/sensorWatch` | Presença do sensor: checagem a cada 2 s fora da coleta, `s=0` no status (6.2) |
+| `startTare/tareTick` | Calibração do offset (TARE) assíncrona no loop |
 | `readBattery()` | Lê ADC 16x e calcula tensão em mV |
-| `publishStatus()` | Notifica o status via BLE (com `r=` e `b=`) |
+| `publishStatus()` | Notifica o status via BLE (com `r=`, `p=`/`t=`, `s=0` e `b=`) |
 | `openLogForWrite/append/close` | I/O em LittleFS |
-| `startCollection/stopCollection/doSample` | Lógica de coleta + transição 1Hz↔5Hz |
+| `startCollection/stopCollection/doSample/sampleFailed` | Lógica de coleta + transição 1Hz↔5Hz + sensor sem resposta na coleta |
 | `startStreaming/streamTick/abortStreaming` | Streaming do log via BLE notify |
 | `httpRoot/httpLog/startWifi/stopWifi` | Webserver + AP (fallback de download) |
 | `handleCommand` + `CmdCallbacks` | Parsing e execução de comandos BLE |
@@ -223,9 +225,9 @@ Tudo da PWA está em `docs/`:
 
 | Comando | Estados em que é válido | Efeito |
 |---|---|---|
-| `START` | IDLE, READY | Apaga `/log.csv`, inicia sessão, reseta contadores |
+| `START` | IDLE, READY (com sensor respondendo) | Apaga `/log.csv`, inicia sessão, reseta contadores. Sem sensor: recusa e reenvia o status com `s=0` |
 | `STOP` | COLLECT | Fecha arquivo, transiciona pra READY |
-| `TARE` | IDLE, READY | Coleta 16 amostras em ~1.3 s, usa a média como offset |
+| `TARE` | IDLE, READY (com sensor respondendo) | Coleta 16 amostras em ~1.3 s, usa a média das leituras válidas como offset. Nenhuma válida: mantém o offset anterior e marca o sensor sem resposta |
 | `READ` | READY (com log existente) | Inicia streaming do `/log.csv` via char `data` |
 | `NOTE n` | COLLECT | Pendura nota fixa (n=1..5) na próxima amostra do CSV |
 | `DOWNLOAD` | IDLE, READY | Sobe AP Wi-Fi |
@@ -250,16 +252,20 @@ A nota fica em `pendingNote` (RAM) e é gravada **na próxima amostra** (piggyba
 
 ### 5.3 Formato do `status` (notify)
 
-String ASCII de até 47 bytes. Estrutura: `<estado-base> [<sub-info>...]`. Campos opcionais:
+String ASCII de até ~50 bytes (buffer de 64). Estrutura: `<estado-base> [<sub-info>...]`. Campos opcionais:
 
 - `r=NNN` — segundos restantes até auto-stop (apenas em COLL)
+- `p=B.B t=T.T` — última leitura de pressão (com TARE) e temperatura (apenas em COLL)
+- `s=0` — sensor sem resposta (em qualquer estado; ausente quando o sensor responde). Ver 6.2
 - `b=NNNN` — tensão da bateria em mV (em qualquer estado, se a leitura for válida)
 
 **Exemplos:**
 
 ```
 IDLE b=4050
+IDLE s=0 b=4050
 COLL 1Hz n=1234 r=6800 b=4015
+COLL 1Hz n=1234 r=6797 p=2.8 t=24.6 s=0 b=4015
 COLL 5Hz n=2500 r=6500 b=4010
 READY n=14400 b=3920
 WIFI 192.168.4.1 b=3895
@@ -269,6 +275,7 @@ WIFI 192.168.4.1 b=3895
 - Em qualquer mudança de estado.
 - A cada amostra durante COLLECT (status com `n` incrementado e `r` decrementado).
 - A cada 5 s quando bateria varia ≥ 20 mV.
+- Quando o sensor some ou volta (fora da coleta), e a cada tentativa de amostra enquanto o sensor está sem resposta na coleta.
 
 ### 5.4 Protocolo de streaming via `data`
 
@@ -321,6 +328,15 @@ O Keller mede temperatura em passos de 0,05 °C e o log grava 1 casa decimal; pe
 - **Histerese** `TEMP_HYST_C = 0.095`: o valor gravado só muda quando a média se afasta 0,095 °C dele; aí é arredondado para 0,1.
 
 O mesmo valor vai para o CSV e para o `t=` do status. Reinicia a cada `START`. Simulado com ruído de ±1 passo: 0 pulos com a temperatura parada em x,x5, subida em escada sem voltar, erro máx. 0,095 °C, ~8 s para acompanhar um degrau de 2 °C. A pressão não passa por filtro.
+
+### 6.2 Presença do sensor
+
+`sensorAlive` diz se o Keller está respondendo; quando é `false` o status leva ` s=0` e a PWA avisa o operador (13.11).
+
+- **Boot:** `sensor.begin()` só inicia o `Wire`; `checkSensor()` lê a faixa (`probe()`: Pmin/Pmax, NaN sem sensor no barramento) e uma amostra.
+- **Fora da coleta** (IDLE/READY, sem TARE nem streaming): `sensorWatch()` no `loop()` chama `checkSensor()` a cada `SENSOR_CHECK_MS` (2 s). Enquanto o sensor está sem resposta, cada checagem relê a faixa: o sensor pode ser ligado com a placa ligada (testado: detecta ligar/desligar em ≤ 2 s). Mudança → `setSensorAlive()` loga `[SENSOR] respondendo`/`sem resposta` e publica o status.
+- **TARE/START** só olham `sensorAlive` (nada de I²C no callback BLE). TARE sem nenhuma leitura válida mantém o offset anterior e marca o sensor sem resposta.
+- **Na coleta:** `doSample()` com leitura falha chama `sampleFailed()`. Depois de `SENSOR_LOST_MS` (3 s) sem leitura válida, `sensorAlive = false` e o status (com a última leitura boa em `p=`/`t=` e `s=0`) sai a cada tentativa. Nada é gravado nesse período. A primeira leitura boa volta `sensorAlive = true`. O auto-stop de 2 h é checado também em `sampleFailed()` (antes, com o sensor morto, a coleta nunca parava sozinha).
 
 ---
 
@@ -404,7 +420,7 @@ O service worker tem `cache: 'reload'` no install para bypassar o HTTP cache do 
 
 | Sintoma | Diagnóstico | Ação |
 |---|---|---|
-| Boot mostra `[AVISO] Sensor Keller nao respondeu` | I²C falhou — provável **board variant errada** | Confirmar board é `XIAO_ESP32C3`, não `ESP32C3 Dev Module`. Verificar wiring SDA=D4, SCL=D5 |
+| Boot mostra `[AVISO] Sensor Keller nao respondeu` (e a PWA mostra "⚠ Sensor nao detectado") | Sensor desligado, ou I²C falhou — provável **board variant errada** | Se o sensor estava desligado, basta ligá-lo: a placa procura a cada 2 s (`[SENSOR] respondendo`). Senão, confirmar board `XIAO_ESP32C3`, não `ESP32C3 Dev Module`, e o wiring SDA=D4, SCL=D5 |
 | Boot mostra `[BAT] 0 mV` ou tensão muito baixa | Divisor de bateria não conectado, ou GPIO errado | Conferir solda no D0 (GPIO2) e R1/R2 |
 | Boot mostra `[ERRO] LittleFS nao iniciou` | Partição corrompida ou inexistente | `LittleFS.begin(true)` confirma format-on-fail; se persistir, refazer partição |
 | BLE conecta mas escrita em `cmd` é ignorada | UUID errado, formato errado | Garantir escrita em formato **TEXT (UTF-8)**, não HEX |
@@ -559,6 +575,12 @@ Um app só, responsivo: `@media (min-width: 700px) and (min-height: 700px)` (o L
 ### 13.10 Indicador de conexão (v29)
 
 O botão `#btnConnect` não mostra mais "Conectado: LoggerP_C3": `setConnectedUi()` esconde o botão e mostra `#statusConn` ("● conectado", verde) ao lado do rótulo ESTADO; `setIdleUi()` volta "Conectar via Bluetooth" (azul); `setReconnectingUi()` mostra "Cancelar reconexao" (`btn-secondary`), escondido em `coll-mode`. Desconectado/Reconectando aparecem no próprio `statusValue`.
+
+### 13.11 Aviso de sensor sem resposta (v30)
+
+`applyState()` lê o `s=0` do status (6.2), tira do texto visível e mantém `sensorMissing`. Com ele: classe `sensor-bad` no card (borda vermelha; `.status-live` e `#statusBigP` com opacidade 0.35, porque são a última leitura boa) e `#statusSensor` visível — "⚠ Sensor sem resposta" em COLL, "⚠ Sensor nao detectado" fora. Na coleta, toast quando cai e quando volta; o sparkline não recebe as amostras repetidas.
+
+`performTareAndStart()`: com `sensorMissing`, só toast (sem TARE). Se o `s=0` chegar durante os 3 s do modal (TARE sem leitura válida), fecha sem o ✓ e não manda START. Depois do START, se o estado não virar COLL em 4 s (e ainda conectado), toast "A coleta nao iniciou" — o firmware recusa START sem responder.
 ---
 
 ## 14. Referências
