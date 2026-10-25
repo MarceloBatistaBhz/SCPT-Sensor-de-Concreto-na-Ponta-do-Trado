@@ -16,6 +16,7 @@
       background: #1a1a1a;
       color: #f0f0f0;
       min-height: 100vh;
+      min-height: 100dvh;   /* no Chrome com barra de endereco, a altura visivel */
     }
     body {
       padding: 1rem;
@@ -253,7 +254,24 @@
     body.coll-mode #btnStart,
     body.coll-mode #shareRow,
     body.coll-mode #historyBox,
-    body.coll-mode #advancedBox { display: none; }
+    body.coll-mode #advancedBox,
+    body.coll-mode #btnManual { display: none; }
+    /* Manual em PDF, 1/4 da largura. O body e coluna flex com altura minima
+       de tela cheia: com pouco conteudo o botao fica no canto inferior
+       esquerdo; com historico/grafico abertos desce junto, sem cobrir nada. */
+    .btn-manual {
+      display: block;
+      width: 25%;
+      align-self: flex-start;
+      margin-top: auto;
+      padding: 0.7rem 0.25rem;
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+      text-align: center;
+      text-decoration: none;
+      background: #ff6b6b;
+      color: #1a1a1a;
+    }
     .hint {
       background: #2a2a2a;
       border-radius: 8px;
@@ -646,7 +664,7 @@
 </head>
 <body>
   <!-- Versao do app: bumpar junto com CACHE em sw.js -->
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v30</span></span></h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v31</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
@@ -752,6 +770,8 @@
     <div class="log" id="log"></div>
   </details>
 
+  <!-- Copia do MANUAL.pdf da raiz, feita por tools/manual/gerar.ps1 -->
+  <a class="btn btn-manual" id="btnManual" href="MANUAL.pdf" target="_blank" rel="noopener">MANUAL</a>
 
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 

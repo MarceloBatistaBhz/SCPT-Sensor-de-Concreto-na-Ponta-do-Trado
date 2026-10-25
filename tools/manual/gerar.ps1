@@ -36,4 +36,6 @@ try {
 } finally {
   $word.Quit()
 }
-Write-Host "OK: $docx e $pdf ($pages paginas)"
+# Copia publicada no GitHub Pages: o botao MANUAL do app abre docs\MANUAL.pdf
+Copy-Item $pdf "$Root\docs\MANUAL.pdf" -Force
+Write-Host "OK: $docx e $pdf ($pages paginas), copiado para docs\MANUAL.pdf"
