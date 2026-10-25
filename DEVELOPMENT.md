@@ -204,6 +204,7 @@ Tudo da PWA está em `docs/`:
 | `manifest.json` | Metadados PWA (nome, ícone, cor de tema) |
 | `sw.js` | Service worker (cache offline com bypass de HTTP cache) |
 | `icon.svg` | Ícone do app (manômetro vetorial) |
+| `MANUAL.pdf` | Cópia do `MANUAL.pdf` da raiz, aberta pelo botão MANUAL (gerada por `tools/manual/gerar.ps1`; não editar à mão) |
 
 ---
 
@@ -395,6 +396,7 @@ A PWA é servida pelo **GitHub Pages** a partir de `/docs` no repo. Atualizar a 
 1. Editar `docs/index.html`, `docs/sw.js`, etc.
 2. **Bumpar** `CACHE` em `sw.js` (ex.: `loggerp-pwa-v11` → `loggerp-pwa-v12`).
 3. **Bumpar** a versão no subtítulo do `index.html` (`<span class="app-version">vN</span>`, mesmo número do `CACHE`). Não há mais rodapé.
+   Se o manual mudou: rodar `tools/manual/gerar.ps1`, que regera `MANUAL.pdf` e copia para `docs/MANUAL.pdf` (o Pages só publica `docs/`).
 4. `git commit && git push origin main`.
 5. GitHub Pages publica em ~30-60 s.
 
@@ -542,8 +544,9 @@ Tracking dos dedos via `Map<pointerId, {x, y}>` reproduz a ergonomia de `e.touch
 
 - Cache versionado (`loggerp-pwa-vN`).
 - `install`: `cache.addAll(ASSETS)` com `cache: 'reload'` para bypassar HTTP cache.
-- `activate`: limpa caches antigos (que não batem com `CACHE`).
+- `activate`: limpa caches antigos (que não batem com `CACHE` nem com `MANUAL_CACHE`).
 - `fetch`: cache-first para mesmo origin, network direto para outros origins (incluindo `http://192.168.4.1`).
+- `MANUAL.pdf` (~4 MB) fica fora do cache versionado, em `scpt-manual` (`MANUAL_CACHE`), para não ser baixado de novo a cada bump: **rede primeiro** (sempre o manual mais novo), e sem sinal serve a última cópia baixada. Só respostas 200 vão para o cache (o leitor de PDF pode pedir trechos, 206).
 
 **Bumpar versão a cada update** é obrigatório para forçar reinstalação do SW.
 
@@ -581,6 +584,10 @@ O botão `#btnConnect` não mostra mais "Conectado: LoggerP_C3": `setConnectedUi
 `applyState()` lê o `s=0` do status (6.2), tira do texto visível e mantém `sensorMissing`. Com ele: classe `sensor-bad` no card (borda vermelha; `.status-live` e `#statusBigP` com opacidade 0.35, porque são a última leitura boa) e `#statusSensor` visível — "⚠ Sensor sem resposta" em COLL, "⚠ Sensor nao detectado" fora. Na coleta, toast quando cai e quando volta; o sparkline não recebe as amostras repetidas.
 
 `performTareAndStart()`: com `sensorMissing`, só toast (sem TARE). Se o `s=0` chegar durante os 3 s do modal (TARE sem leitura válida), fecha sem o ✓ e não manda START. Depois do START, se o estado não virar COLL em 4 s (e ainda conectado), toast "A coleta nao iniciou" — o firmware recusa START sem responder.
+### 13.12 Botão MANUAL (v31)
+
+`<a class="btn btn-manual" id="btnManual" href="MANUAL.pdf" target="_blank">` depois do `#advancedBox`: 25% da largura, vermelho (`#ff6b6b`) com texto preto. O `body` já é coluna flex com `min-height: 100vh/100dvh`, então `margin-top: auto` + `align-self: flex-start` deixam o botão no canto inferior esquerdo quando a página é curta, e no fim da página (sem cobrir nada) com histórico/gráfico abertos. Some em `coll-mode`. No Android o PDF abre no leitor do Chrome (ou no app de PDF padrão, conforme o aparelho); offline vem do `scpt-manual` (13.6).
+
 ---
 
 ## 14. Referências

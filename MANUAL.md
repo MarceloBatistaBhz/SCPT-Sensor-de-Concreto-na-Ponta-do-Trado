@@ -64,7 +64,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 ![Tela do app SCPT durante uma coleta](img/pwa-coleta.png)
 
-**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v30`). Informe a versão ao relatar algum problema.
+**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v31`). Informe a versão ao relatar algum problema.
 
 **No tablet** a tela é a mesma, na mesma ordem, mas ocupa a largura toda e mostra tudo maior: textos, botões, valores ao vivo e gráfico. Durante a coleta, a **pressão ao vivo** aparece também em tamanho bem grande, à direita no card Estado (só o número, ex.: `0.7`), para ler de longe. O app se ajusta sozinho ao tamanho da tela e fica sempre em pé (retrato).
 
@@ -85,6 +85,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 - **Baixar de novo** (azul): só aparece se o download automático do log falhar (ver 7.6). Para compartilhar uma coleta, use o **Historico** (ver 7.6 e 7.10).
 - **Historico (N)**: lista recolhida com as últimas 20 coletas baixadas, guardadas no celular, com uma lixeira à direita para apagar o histórico inteiro (ver 7.10).
 - **Avançado**: menu recolhido com as funções menos usadas (apagar log, download via Wi-Fi etc.).
+- **MANUAL** (vermelho, no canto inferior esquerdo): abre este manual em PDF no Chrome. Depois de aberto uma vez com internet, abre também sem sinal. Não aparece durante a coleta.
 
 **Cores do card Estado:**
 - 🔵 **Azul** = Pronto (READY) — log disponível para download
