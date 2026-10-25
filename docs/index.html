@@ -664,7 +664,7 @@
 </head>
 <body>
   <!-- Versao do app: bumpar junto com CACHE em sw.js -->
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v31</span></span></h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v32</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
@@ -940,12 +940,103 @@
 
     let collStartedMs = null;   // millis quando a PWA viu COLL pela 1a vez
 
+    // === Eventos guardados no celular ===
+    // O equipamento passa ~95% da coleta sem conexao (descendo no furo). Todo
+    // evento fica guardado aqui com a hora do celular; com conexao vai tambem
+    // pro equipamento (sent: true). Os nao enviados entram no CSV ao baixar o
+    // log: a coluna ms do CSV conta desde o inicio da coleta (1 ou 5 Hz nao
+    // importa), e o e= do status diz a que horas do celular ela comecou.
+    // Guardado em localStorage: sobrevive ao app fechar no meio da coleta.
+    const SESS_KEY = 'scpt-eventos';
+    const SAME_SESSION_MS = 5000;   // estimativas do inicio dentro disto = mesma coleta
+    let sessEv = loadSessEv();      // { startMs, active, events: [{ t, tag, sent }] }
+
+    function loadSessEv() {
+      try {
+        const s = JSON.parse(localStorage.getItem(SESS_KEY));
+        if (s && Array.isArray(s.events)) return s;
+      } catch (_) { /* sem storage ou JSON ruim: comeca vazio */ }
+      return { startMs: null, active: false, events: [] };
+    }
+    function saveSessEv() {
+      try { localStorage.setItem(SESS_KEY, JSON.stringify(sessEv)); } catch (_) {}
+    }
+
+    // Inicio da coleta no relogio do celular = agora - e. O atraso do BLE so
+    // empurra a estimativa pra depois, entao fica a menor. Estimativa longe da
+    // guardada = outra coleta: descarta os eventos de antes dela.
+    function syncSessionStart(est) {
+      if (sessEv.startMs !== null && Math.abs(est - sessEv.startMs) < SAME_SESSION_MS) {
+        if (est < sessEv.startMs) { sessEv.startMs = est; saveSessEv(); }
+        return;
+      }
+      sessEv.startMs = est;
+      sessEv.events  = sessEv.events.filter((ev) => ev.t >= est - SAME_SESSION_MS);
+      saveSessEv();
+    }
+
+    function setSessActive(active) {
+      if (sessEv.active === active) return;
+      sessEv.active = active;
+      saveSessEv();
+    }
+
+    function pendingEvents() {
+      return sessEv.events.filter((ev) => !ev.sent);
+    }
+
+    // Botao visivel durante a coleta, conectado ou nao (inclusive com o app
+    // reaberto sem conexao); mostra quantos eventos ainda estao so no celular.
+    function updateMarkButton() {
+      const btn = $('btnMarkMoment');
+      btn.hidden = !(collectMode || sessEv.active);
+      const n = pendingEvents().length;
+      btn.textContent = 'Marcar Evento' + (n ? ' (' + n + ' no celular)' : '');
+    }
+
+    // Escreve no CSV baixado os eventos que nao foram pro equipamento: cada um
+    // na coluna note da 1a amostra a partir do instante dele (a ultima, se o
+    // toque foi depois dela), pulando amostras que ja tem nota. Mesmo log +
+    // mesmos eventos = mesmo arquivo, entao baixar de novo nao duplica nada.
+    function mergePhoneEvents(bytes) {
+      const pend = pendingEvents();
+      if (sessEv.startMs === null || !pend.length) return { bytes, count: 0 };
+      const lines = new TextDecoder().decode(bytes).split('\n');
+      const rows = [];   // { i: linha, ms }
+      for (let i = 1; i < lines.length; i++) {
+        const ms = parseInt(lines[i], 10);
+        if (isFinite(ms)) rows.push({ i, ms });
+      }
+      if (!rows.length) return { bytes, count: 0 };
+      const lastMs = rows[rows.length - 1].ms;
+      const noteOf = (row) => (lines[row.i].replace(/\r$/, '').split(';')[3] || '').trim();
+      let count = 0;
+      pend.slice().sort((a, b) => a.t - b.t).forEach((ev) => {
+        const rel = ev.t - sessEv.startMs;
+        // Fora da coleta deste log (ex.: log antigo que ficou no equipamento)
+        if (rel < -SAME_SESSION_MS || rel > lastMs + 60000) return;
+        let k = rows.findIndex((r) => r.ms >= rel);
+        if (k < 0) k = rows.length - 1;
+        while (k < rows.length - 1 && noteOf(rows[k])) k++;
+        if (noteOf(rows[k])) return;   // ate a ultima amostra ja tem nota
+        const raw = lines[rows[k].i];
+        const cr = raw.endsWith('\r') ? '\r' : '';
+        const parts = raw.replace(/\r$/, '').split(';');
+        while (parts.length < 4) parts.push('');
+        parts[3] = NOTE_LABELS[ev.tag];
+        lines[rows[k].i] = parts.join(';') + cr;
+        count++;
+      });
+      return { bytes: count ? new TextEncoder().encode(lines.join('\n')) : bytes, count };
+    }
+
     function openNoteModal() {
-      if (!cmdChar) { showToast('Nao conectado', 'error', 2000); return; }
+      if (!(collectMode || sessEv.active)) return;
       const modal = $('noteModal');
       // Calcula quanto tempo decorrido na coleta (so display, sem persistir)
-      if (collStartedMs) {
-        const dt = Math.floor((Date.now() - collStartedMs) / 1000);
+      const t0 = sessEv.startMs !== null ? sessEv.startMs : collStartedMs;
+      if (t0) {
+        const dt = Math.max(0, Math.floor((Date.now() - t0) / 1000));
         const m = Math.floor(dt / 60);
         const s = dt % 60;
         $('noteModalTime').textContent =
@@ -964,12 +1055,22 @@
         modal.classList.remove('closing');
       }, 500);
     }
-    function pickNote(tag) {
+    async function pickNote(tag) {
       const label = NOTE_LABELS[tag];
       if (!label) return;
-      sendCmd('NOTE ' + tag);
-      showToast('Marcado: ' + label, 'success', 2200);
       closeNoteModal();
+      // Guarda antes de tentar enviar: se a conexao cair no meio, nao se perde
+      const ev = { t: Date.now(), tag, sent: false };
+      sessEv.events.push(ev);
+      saveSessEv();
+      if (cmdChar && lastSeenState.startsWith('COLL') && await sendCmd('NOTE ' + tag)) {
+        ev.sent = true;
+        saveSessEv();
+        showToast('Marcado: ' + label, 'success', 2200);
+      } else {
+        showToast('Guardado no celular: ' + label + '. Entra no log ao baixar.', 'info', 3500);
+      }
+      updateMarkButton();
     }
 
     function formatHMS(seconds) {
@@ -1119,12 +1220,15 @@
       const livePres   = matchP ? parseFloat(matchP[1])    : null;
       const liveTemp   = matchT ? parseFloat(matchT[1])    : null;
       const sensorBad  = /\ss=0\b/.test(text);
+      const matchE = text.match(/\se=(\d+)/);   // ms desde o inicio da coleta
+      const elapsedMs  = matchE ? parseInt(matchE[1], 10) : null;
       const visibleText = text
         .replace(/\s*r=\d+/, '')
         .replace(/\s*b=\d+/, '')
         .replace(/\s*p=-?\d+\.\d+/, '')
         .replace(/\s*t=-?\d+\.\d+/, '')
-        .replace(/\ss=0\b/, '');
+        .replace(/\ss=0\b/, '')
+        .replace(/\se=\d+/, '');
 
       // READY: na tela fica so "READY". O n= continua em lastSeenState porque
       // identifica a coleta (download automatico e historico).
@@ -1146,6 +1250,13 @@
       if (isColl) collectMode = true;
       else if (visibleText !== 'Reconectando') collectMode = false;
       document.body.classList.toggle('coll-mode', collectMode);
+
+      // Relogio comum com o equipamento pros eventos guardados no celular.
+      // So estados vindos do equipamento mudam o "coleta em andamento";
+      // Reconectando/Desconectado mantem o que estava.
+      if (elapsedMs !== null) syncSessionStart(Date.now() - elapsedMs);
+      if (isColl) setSessActive(true);
+      else if (/^(IDLE|READY|WIFI)/.test(visibleText)) setSessActive(false);
 
       // Coleta nova: grafico e log da coleta anterior saem da tela.
       // Coleta encerrada com o app olhando (Parar ou auto-stop): baixa sozinho.
@@ -1171,8 +1282,8 @@
       }
       // Botao big-mode so faz sentido quando ha live data
       $('btnBigMode').hidden = !hasLive;
-      // Botao "Marcar Evento" visivel apenas durante COLL e conectado
-      $('btnMarkMoment').hidden = !(isColl && !!cmdChar);
+      // "Marcar Evento" durante a coleta, conectado ou nao
+      updateMarkButton();
       // Anchor de tempo da coleta — usado so pro display do modal de nota
       if (isColl && !wasColl) collStartedMs = Date.now();
       if (!isColl)             collStartedMs = null;
@@ -1298,14 +1409,17 @@
       updateActionButtons();
     }
 
+    // true se o equipamento confirmou a escrita
     async function sendCmd(cmd) {
-      if (!cmdChar) { logLine('Nao conectado', 'err'); return; }
+      if (!cmdChar) { logLine('Nao conectado', 'err'); return false; }
       try {
         const data = new TextEncoder().encode(cmd);
         await cmdChar.writeValueWithResponse(data);
         logLine('-> ' + cmd, 'ok');
+        return true;
       } catch (e) {
         logLine('Erro ao enviar ' + cmd + ': ' + e.message, 'err');
+        return false;
       }
     }
 
@@ -1431,16 +1545,22 @@
         '.csv';
 
       logLine('Transferencia completa (' + streamReceived + ' bytes).', 'ok');
+      // Eventos marcados sem conexao entram na coluna note (ver mergePhoneEvents)
+      const merged = mergePhoneEvents(total);
+      if (merged.count) logLine(merged.count + ' evento(s) do celular escritos no log.', 'ok');
       // Download ao conectar e silencioso: sem grafico, e aviso so se a coleta
       // for nova (terminou longe do celular) — ver o .then do saveToHistory
       const quiet = (downloadReason === 'connect') && historyEnabled;
-      if (!quiet) showToast('Log baixado (' + (streamReceived / 1024).toFixed(1) + ' KB)', 'success');
+      if (!quiet) {
+        showToast('Log baixado (' + (streamReceived / 1024).toFixed(1) + ' KB)' +
+                  (merged.count ? ', com ' + merged.count + ' evento(s) do celular' : ''), 'success');
+      }
 
       // Guarda o log pro botao Compartilhar; n identifica a coleta
-      localLog = { bytes: total, fname, n: readyCount(lastSeenState) };
+      localLog = { bytes: merged.bytes, fname, n: readyCount(lastSeenState) };
       downloadInFlight = false;
       downloadFailed   = false;
-      if (downloadReason !== 'connect') renderChart(total);
+      if (downloadReason !== 'connect') renderChart(merged.bytes);
       resetStream();
       updateActionButtons();
 
@@ -2343,6 +2463,8 @@
     // Historico funciona sem conexao: carrega ja na abertura do app
     if (historyEnabled) loadHistory();
     else $('historyBox').hidden = true;
+    // App reaberto no meio de uma coleta, sem conexao: ja pode marcar eventos
+    updateMarkButton();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(() => {});
