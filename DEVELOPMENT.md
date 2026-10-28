@@ -100,14 +100,14 @@ stateDiagram-v2
 | SDA (I²C) | D4 | GPIO6 | SDA do sensor Keller |
 | SCL (I²C) | D5 | GPIO7 | SCL do sensor Keller |
 | BAT_SENSE (ADC) | D0 | GPIO2 | Ponto médio do divisor 100k:100k |
-| LED 1 | D1 | GPIO3 | LED + resistor 2k7 para o GND (acende em HIGH) |
-| LED 2 | D2 | GPIO4 | LED + resistor 2k7 para o GND (acende em HIGH) |
+| LED 1 | D1 | GPIO3 | LED + resistor 2k7 até o 3V3 (acende com o pino em LOW) |
+| LED 2 | D2 | GPIO4 | LED + resistor 2k7 até o 3V3 (acende com o pino em LOW) |
 | 3V3 | 3V3 | — | VCC do sensor |
 | GND | GND | — | GND do sensor + GND do divisor |
 
 `Wire.begin()` usa SDA/SCL automaticamente quando a board variant **`XIAO_ESP32C3`** está selecionada na Arduino IDE. Não precisa especificar pinos manualmente.
 
-**LEDs na partida:** no fim do `setup()` o LED 1 pisca 3x e depois o LED 2 pisca 3x, a 2 Hz (`blinkLed()`, 3 s no total). O BLE já está anunciando nessa hora (roda na task do NimBLE), então a conexão do app não espera. Em placa sem os LEDs, D1/D2 só ficam alternando sem nada ligado.
+**LEDs na partida:** no fim do `setup()` o LED 1 pisca 3x e depois o LED 2 pisca 3x, a 2 Hz (`blinkLed()`, 3 s no total; `LED_ON` = LOW). No core 3.x o `digitalWrite` antes do `pinMode` é ignorado: por isso o `setup()` faz `pinMode` e logo depois apaga (HIGH). O BLE já está anunciando nessa hora (roda na task do NimBLE), então a conexão do app não espera. Em placa sem os LEDs, D1/D2 só ficam alternando sem nada ligado.
 
 ### 2.3 Board variant — atenção
 
