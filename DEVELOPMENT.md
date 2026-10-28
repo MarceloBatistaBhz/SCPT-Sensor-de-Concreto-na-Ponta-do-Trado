@@ -218,7 +218,7 @@ Tudo da PWA está em `docs/`:
 | Char `cmd` (Write) | `9b78c002-c0de-4d65-a1aa-001122334455` |
 | Char `status` (Read + Notify) | `9b78c003-c0de-4d65-a1aa-001122334455` |
 | Char `data` (Notify) | `9b78c004-c0de-4d65-a1aa-001122334455` |
-| Device name | `LoggerP_C3` |
+| Device name | `SCPT01`, `SCPT02`... por placa: `BOARD_NAMES` no firmware mapeia o MAC do Bluetooth (`esp_read_mac(..., ESP_MAC_BT)`) no nome; placa fora da tabela vira `SCPT-XXXX` (fim do MAC). Um firmware só para todas. Wi-Fi: `<nome>_AP` |
 | MTU | Negociado até 247 bytes (Android negocia automaticamente) |
 | Advertising | **Legacy** (BLE 4.x), 1M PHY, interval 2000 ms |
 
@@ -428,7 +428,7 @@ O service worker tem `cache: 'reload'` no install para bypassar o HTTP cache do 
 | Boot mostra `[BAT] 0 mV` ou tensão muito baixa | Divisor de bateria não conectado, ou GPIO errado | Conferir solda no D0 (GPIO2) e R1/R2 |
 | Boot mostra `[ERRO] LittleFS nao iniciou` | Partição corrompida ou inexistente | `LittleFS.begin(true)` confirma format-on-fail; se persistir, refazer partição |
 | BLE conecta mas escrita em `cmd` é ignorada | UUID errado, formato errado | Garantir escrita em formato **TEXT (UTF-8)**, não HEX |
-| PWA não acha o `LoggerP_C3` mas nRF Connect acha | Firmware está em Extended Advertising em vez de Legacy | Confirmar `setupBLE()` usa `NimBLEAdvertising`, não `NimBLEExtAdvertising` |
+| PWA não acha o `SCPT0N` mas nRF Connect acha | Firmware está em Extended Advertising em vez de Legacy | Confirmar `setupBLE()` usa `NimBLEAdvertising`, não `NimBLEExtAdvertising` |
 | AP Wi-Fi sobe mas celular não conecta | Em alguns Androids, redes 100% abertas exigem confirmação manual | Adicionar rede manualmente |
 | Pressão lida está sempre próxima de zero (mas com pequenas variações) | Comportamento esperado em modo gauge (`P_MODE=0`) | Em atmosfera, ~0 ± 0,1 bar é normal |
 | Após disconnect, dispositivo "some" e exige reset | `ServerCallbacks::onDisconnect` não está reiniciando adv | Confirmar que `pServer->setCallbacks(new ServerCallbacks())` está em `setupBLE()` |
@@ -493,7 +493,7 @@ esp_pm_configure(&pm);
 
 ### 13.1 Fluxo de conexão
 
-1. **`requestDevice`** com filtro por nome (`LoggerP_C3`) e `optionalServices` listando o UUID do serviço.
+1. **`requestDevice`** com filtro `namePrefix: 'SCPT'` (mais `name: 'LoggerP_C3'`, placa com firmware anterior aos nomes) e `optionalServices` listando o UUID do serviço. `setConnectedUi()` mostra a rede Wi-Fi do equipamento conectado (`<nome>_AP`) na dica do download via Wi-Fi.
 2. **`gatt.connect()`** abre conexão GATT.
 3. **`bindCharacteristics()`** localiza CMD, STATUS, DATA. Subscribe nas duas notify com `oncharacteristicvaluechanged = ...` (atribuição: rodar o bind 2x troca o handler em vez de duplicar). Por último arma o download automático (ver 13.3).
 4. **Wake Lock API** mantém a tela acesa para evitar que Chrome descarte o `BluetoothDevice`.

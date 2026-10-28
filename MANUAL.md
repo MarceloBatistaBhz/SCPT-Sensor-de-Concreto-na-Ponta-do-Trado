@@ -1,6 +1,6 @@
 # Manual de Operação — Datalogger de Pressão Hidráulica
 
-**Modelo:** LoggerP_C3\
+**Equipamentos:** SCPT01 e SCPT02 (o nome de cada um aparece no Bluetooth e na rede Wi-Fi)\
 **Hardware:** ESP32-C3 (Seeed XIAO) + sensor Keller PA9LD-50bar\
 **Bateria:** LiPo 3,7 V 250 mAh recarregável
 
@@ -56,7 +56,7 @@ A partir daqui, abrir o app SCPT é igual a abrir qualquer outro app. Funciona o
 
 O equipamento liga **assim que a bateria é conectada** ou assim que o cabo USB é plugado. Não há botão de power.
 
-Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluetooth"** e verifique se `LoggerP_C3` aparece na lista de dispositivos próximos.
+Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluetooth"** e verifique se o nome do equipamento (`SCPT01` ou `SCPT02`) aparece na lista de dispositivos próximos.
 
 ---
 
@@ -64,7 +64,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 ![Tela do app SCPT durante uma coleta](img/pwa-coleta.png)
 
-**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v32`). Informe a versão ao relatar algum problema.
+**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v33`). Informe a versão ao relatar algum problema.
 
 **No tablet** a tela é a mesma, na mesma ordem, mas ocupa a largura toda e mostra tudo maior: textos, botões, valores ao vivo e gráfico. Durante a coleta, a **pressão ao vivo** aparece também em tamanho bem grande, à direita no card Estado (só o número, ex.: `0.7`), para ler de longe. O app se ajusta sozinho ao tamanho da tela e fica sempre em pé (retrato).
 
@@ -108,7 +108,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 1. Abra o app SCPT no celular.
 2. Confirme **Bluetooth ligado** e **Localização ligada** (Android exige localização ativa para scan BLE — exigência do sistema).
 3. Toque em **"Conectar via Bluetooth"**.
-4. Escolha `LoggerP_C3` na lista que aparece.
+4. Escolha o equipamento na lista que aparece (`SCPT01` ou `SCPT02`). Com os dois ligados por perto, os dois aparecem: confira o nome escrito no equipamento.
 5. Em ~2 s o card "Estado" muda de "Desconectado" para `IDLE` (ou `READY` se houver log de sessão anterior), aparece **● conectado** ao lado de ESTADO e o botão "Conectar via Bluetooth" some.
 
 ### 7.2 Iniciar coleta
@@ -215,7 +215,7 @@ Caso o BLE file transfer falhe (link instável, arquivo muito grande, etc.), há
 1. Expanda **"Avançado"** no app.
 2. Toque em **"Preparar download (Wi-Fi)"**. Estado muda para `WIFI 192.168.4.1`.
 3. Saia do app (não feche), vá em **Wi-Fi** do celular.
-4. Conecte na rede `LoggerP_AP` (sem senha). Aceite "manter conectado mesmo sem internet".
+4. Conecte na rede do equipamento, `SCPT01_AP` ou `SCPT02_AP` (sem senha; o app mostra o nome certo). Aceite "manter conectado mesmo sem internet".
 5. Volte no app e toque em **"Abrir log.csv"**.
 6. O navegador baixa o arquivo. Compartilhe via menu do sistema do celular.
 
@@ -294,13 +294,13 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 
 | Sintoma | Possível causa | O que fazer |
 |---|---|---|
-| `LoggerP_C3` não aparece ao tocar "Conectar" | Equipamento desligado, fora de alcance, ou Bluetooth/Localização desligados | Confirme bateria, aproxime do celular, ative BT e Localização |
+| `SCPT01`/`SCPT02` não aparece ao tocar "Conectar" | Equipamento desligado, fora de alcance, ou Bluetooth/Localização desligados | Confirme bateria, aproxime do celular, ative BT e Localização |
 | Conecta mas estado fica em "Reconectando..." | Distância no limite, ou ruído | Aproxime mais. O app tenta reconectar automaticamente |
 | Card mostra **⚠ Sensor nao detectado** e a coleta não começa | Cabo do sensor solto, desligado ou danificado | Confira o conector e o cabo. O aviso some sozinho em até 2 s quando o sensor responde; não precisa desligar o equipamento |
 | **⚠ Sensor sem resposta** durante a coleta | Cabo soltou ou rompeu no meio da coleta | Nada é gravado enquanto durar. Se o sensor voltar, a gravação continua sozinha; senão pare a coleta e confira o cabo |
 | App avisa **"A coleta nao iniciou"** | O equipamento recusou o início (ex.: falha ao criar o arquivo) | Toque em "Iniciar coleta" de novo. Se repetir, desligue e ligue o equipamento |
 | Download trava na barra de progresso | Link BLE instável | Aguarde 15 s: o app avisa e mostra **"Baixar de novo"**. Aproxime o celular e toque nele; se continuar falhando, use a opção Wi-Fi (Avançado) |
-| Wi-Fi `LoggerP_AP` não aparece após DOWNLOAD | Alguns Androids escondem redes abertas | Adicionar rede manualmente no celular: `LoggerP_AP`, sem senha |
+| Wi-Fi `SCPT0N_AP` não aparece após DOWNLOAD | Alguns Androids escondem redes abertas | Adicionar rede manualmente no celular: `SCPT01_AP` ou `SCPT02_AP`, sem senha |
 | Indicador de bateria sumiu | Pode ser desconexão recente | Aguarde uns segundos; aparece novamente quando o status atualiza |
 | Após queda de energia, aparece `READY` no boot | Sessão anterior interrompida | Os dados gravados estão preservados. Ao conectar, o app baixa o log sozinho; compartilhe antes de um novo "Iniciar coleta" |
 | Equipamento parou de gravar antes de 2 h | Bateria acabou | Recarregue. Os dados gravados estão preservados |
@@ -328,8 +328,8 @@ Não há botão de reset acessível externamente. Para forçar reinicialização
 | **Taxa de amostragem** | 1 Hz padrão, 5 Hz adaptativo (ΔP > 0,2 bar) |
 | **Duração máxima de sessão** | 2 horas |
 | **Formato de saída** | CSV (`ms;bar;degC;note`) |
-| **Identificador BLE** | `LoggerP_C3` |
-| **SSID Wi-Fi para download** | `LoggerP_AP` (rede aberta) |
+| **Identificador BLE** | `SCPT01`, `SCPT02` (um por equipamento) |
+| **SSID Wi-Fi para download** | `SCPT01_AP`, `SCPT02_AP` (rede aberta) |
 | **App SCPT** | https://marcelobatistabhz.github.io/SCPT-Sensor-de-Concreto-na-Ponta-do-Trado/ |
 
 ---
