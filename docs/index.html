@@ -664,7 +664,7 @@
 </head>
 <body>
   <!-- Versao do app: bumpar junto com CACHE em sw.js -->
-  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v32</span></span></h1>
+  <h1>SCPT<span class="subtitle">Sensor de Concreto na Ponta do Trado <span class="app-version">v33</span></span></h1>
 
   <div class="status-card discon" id="statusCard">
     <div class="status-row-top">
@@ -759,7 +759,7 @@
 
     <div class="hint" id="wifiHint" hidden style="margin-top: 0.5rem;">
       <strong>Proximo passo:</strong> conecte o celular ao Wi-Fi
-      <strong>LoggerP_AP</strong> (sem senha) e toque no botao abaixo.
+      <strong id="wifiSsid">SCPT01_AP</strong> (sem senha) e toque no botao abaixo.
     </div>
 
     <button class="btn btn-secondary" id="btnOpenCsv"  hidden style="margin-top: 0.5rem;">Abrir log.csv (192.168.4.1)</button>
@@ -2246,6 +2246,10 @@
     function setConnectedUi() {
       $('btnConnect').hidden = true;
       $('statusConn').hidden = false;
+      // Rede Wi-Fi do equipamento conectado: SCPT02 -> SCPT02_AP
+      if (device && device.name) {
+        $('wifiSsid').textContent = device.name.startsWith('SCPT') ? device.name + '_AP' : 'LoggerP_AP';
+      }
     }
     function setIdleUi() {
       $('btnConnect').hidden = false;
@@ -2264,9 +2268,11 @@
 
     async function connect() {
       try {
-        logLine('Procurando LoggerP_C3...');
+        logLine('Procurando equipamento SCPT...');
+        // SCPT01, SCPT02... (nome por placa, ver BOARD_NAMES no firmware).
+        // LoggerP_C3 = placa ainda com o firmware de antes dos nomes.
         device = await navigator.bluetooth.requestDevice({
-          filters: [{ name: 'LoggerP_C3' }],
+          filters: [{ namePrefix: 'SCPT' }, { name: 'LoggerP_C3' }],
           optionalServices: [SVC_UUID],
         });
         device.addEventListener('gattserverdisconnected', onDisconnected);
