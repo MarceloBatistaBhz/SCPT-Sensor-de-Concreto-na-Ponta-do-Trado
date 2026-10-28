@@ -225,6 +225,7 @@ Tudo da PWA está em `docs/`:
 | Char `status` (Read + Notify) | `9b78c003-c0de-4d65-a1aa-001122334455` |
 | Char `data` (Notify) | `9b78c004-c0de-4d65-a1aa-001122334455` |
 | Device name | `SCPT01`, `SCPT02`... por placa: `BOARD_NAMES` no firmware mapeia o MAC do Bluetooth (`esp_read_mac(..., ESP_MAC_BT)`) no nome; placa fora da tabela vira `SCPT-XXXX` (fim do MAC). Um firmware só para todas. Wi-Fi: `<nome>_AP` |
+| Potência TX | Por placa, também em `BOARD_NAMES` (`txPowerDbm`): ESP32-C3 aceita −24 a +20 dBm em passos de 3. SCPT01 em 0 dBm e SCPT02 em +20 dBm (2026-10-28) para comparar em campo até que profundidade a conexão aguenta. A partida loga a potência efetiva (`[BLE] … | TX +20 dBm`) |
 | MTU | Negociado até 247 bytes (Android negocia automaticamente) |
 | Advertising | **Legacy** (BLE 4.x), 1M PHY, interval 2000 ms |
 
