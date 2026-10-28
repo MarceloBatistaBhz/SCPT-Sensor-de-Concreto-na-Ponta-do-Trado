@@ -107,6 +107,8 @@ stateDiagram-v2
 
 `Wire.begin()` usa SDA/SCL automaticamente quando a board variant **`XIAO_ESP32C3`** está selecionada na Arduino IDE. Não precisa especificar pinos manualmente.
 
+**I²C:** 100 kHz (`Wire.setClock(100000)` em `KellerLD::begin()`), com **pull-ups externos de 2k7** do SDA e do SCL para o 3V3 (o driver também liga os internos, ~45 kΩ, em paralelo). Com ~20 cm de fio wire-wrap (~25 pF), a borda de subida fica em ~60 ns (norma: ≤ 1 µs a 100 kHz) e a corrente em nível baixo em ~1,2 mA (norma: ≤ 3 mA). Só com os internos a borda ficaria em ~1 µs, no limite.
+
 **LEDs na partida:** no fim do `setup()` o LED 1 pisca 3x e depois o LED 2 pisca 3x, a 2 Hz (`blinkLed()`, 3 s no total; `LED_ON` = LOW). No core 3.x o `digitalWrite` antes do `pinMode` é ignorado: por isso o `setup()` faz `pinMode` e logo depois apaga (HIGH). O BLE já está anunciando nessa hora (roda na task do NimBLE), então a conexão do app não espera. Em placa sem os LEDs, D1/D2 só ficam alternando sem nada ligado.
 
 ### 2.3 Board variant — atenção
