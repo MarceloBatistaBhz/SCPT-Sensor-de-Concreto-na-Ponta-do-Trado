@@ -64,7 +64,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 
 ![Tela do app SCPT durante uma coleta](img/pwa-coleta.png)
 
-**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v33`). Informe a versão ao relatar algum problema.
+**Topo:** o nome do app e, no fim do subtítulo, a **versão** (ex.: `v34`). Informe a versão ao relatar algum problema.
 
 **No tablet** a tela é a mesma, na mesma ordem, mas ocupa a largura toda e mostra tudo maior: textos, botões, valores ao vivo e gráfico. Durante a coleta, a **pressão ao vivo** aparece também em tamanho bem grande, à direita no card Estado (só o número, ex.: `0.7`), para ler de longe. O app se ajusta sozinho ao tamanho da tela e fica sempre em pé (retrato).
 
@@ -85,7 +85,7 @@ Para confirmar que está ligado: abra o app SCPT, toque em **"Conectar via Bluet
 - **Baixar de novo** (azul): só aparece se o download automático do log falhar (ver 7.6). Para compartilhar uma coleta, use o **Historico** (ver 7.6 e 7.10).
 - **Historico (N)**: lista recolhida com as últimas 20 coletas baixadas, guardadas no celular, com uma lixeira à direita para apagar o histórico inteiro (ver 7.10).
 - **Avançado**: menu recolhido com as funções menos usadas (apagar log, download via Wi-Fi etc.).
-- **MANUAL** (vermelho, no canto inferior esquerdo): abre este manual em PDF no Chrome. Depois de aberto uma vez com internet, abre também sem sinal. Não aparece durante a coleta.
+- **MANUAL** (vermelho, no canto inferior esquerdo): abre este manual em PDF no Chrome. Depois de aberto uma vez com internet, abre também sem sinal ou com o site do app fora do ar. Não aparece durante a coleta.
 
 **Cores do card Estado:**
 - 🔵 **Azul** = Pronto (READY) — log disponível para download
@@ -304,6 +304,7 @@ Compatível com Excel BR (Importar de Texto, separador `;`).
 | Indicador de bateria sumiu | Pode ser desconexão recente | Aguarde uns segundos; aparece novamente quando o status atualiza |
 | Após queda de energia, aparece `READY` no boot | Sessão anterior interrompida | Os dados gravados estão preservados. Ao conectar, o app baixa o log sozinho; compartilhe antes de um novo "Iniciar coleta" |
 | Equipamento parou de gravar antes de 2 h | Bateria acabou | Recarregue. Os dados gravados estão preservados |
+| Página do GitHub "There isn't a GitHub Pages site here" (erro 404) ao abrir o link do app ou o manual | Site do app fora do ar (ex.: repositório do GitHub passou para privado) | O app já instalado continua funcionando, e o manual abre pela cópia guardada no celular. Avise o responsável pelo app: o repositório precisa estar **público** |
 | Histórico sumiu ou ficou vazio | Histórico apagado pela lixeira, app desinstalado, ou dados do app limpos nas configurações do Android | Não há como recuperar no celular. As coletas compartilhadas continuam onde foram enviadas, e a última coleta continua no equipamento até o próximo "Iniciar coleta" |
 
 ### Forçar reset do equipamento

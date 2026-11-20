@@ -409,7 +409,7 @@ A PWA é servida pelo **GitHub Pages** a partir de `/docs` no repo. Atualizar a 
 4. `git commit && git push origin main`.
 5. GitHub Pages publica em ~30-60 s.
 
-O repositório precisa ser **público**: no plano gratuito do GitHub, tornar o repo privado desativa o Pages e o link da PWA passa a dar 404 (aconteceu entre 2026-05 e 2026-10).
+O repositório precisa ser **público**: no plano gratuito do GitHub, tornar o repo privado desativa o Pages e o link da PWA passa a dar 404 (aconteceu entre 2026-05 e 2026-10, e de novo em 2026-11). Voltar a público **não** religa o Pages sozinho: `gh api -X POST repos/<dono>/<repo>/pages -f source[branch]=main -f source[path]=/docs`.
 
 O service worker tem `cache: 'reload'` no install para bypassar o HTTP cache do GitHub Pages (que envia `Cache-Control: max-age=600`). Isso garante que atualizações chegam em ~1 minuto, não esperando o cache HTTP expirar.
 
@@ -555,7 +555,7 @@ Tracking dos dedos via `Map<pointerId, {x, y}>` reproduz a ergonomia de `e.touch
 - `install`: `cache.addAll(ASSETS)` com `cache: 'reload'` para bypassar HTTP cache.
 - `activate`: limpa caches antigos (que não batem com `CACHE` nem com `MANUAL_CACHE`).
 - `fetch`: cache-first para mesmo origin, network direto para outros origins (incluindo `http://192.168.4.1`).
-- `MANUAL.pdf` (~4 MB) fica fora do cache versionado, em `scpt-manual` (`MANUAL_CACHE`), para não ser baixado de novo a cada bump: **rede primeiro** (sempre o manual mais novo), e sem sinal serve a última cópia baixada. Só respostas 200 vão para o cache (o leitor de PDF pode pedir trechos, 206).
+- `MANUAL.pdf` (~4 MB) fica fora do cache versionado, em `scpt-manual` (`MANUAL_CACHE`), para não ser baixado de novo a cada bump: **rede primeiro** (sempre o manual mais novo); sem sinal, ou com o servidor respondendo erro (ex.: 404 com o Pages desligado, v34), serve a última cópia baixada. Só respostas 200 vão para o cache (o leitor de PDF pode pedir trechos, 206, que passam direto).
 
 **Bumpar versão a cada update** é obrigatório para forçar reinstalação do SW.
 
