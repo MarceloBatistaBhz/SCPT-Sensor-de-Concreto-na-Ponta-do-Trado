@@ -1,6 +1,6 @@
 // Service worker minimo: cache-first pros assets do app, network passa direto
 // pra qualquer outra coisa (como o http://192.168.4.1/log.csv).
-const CACHE = 'loggerp-pwa-v33';
+const CACHE = 'loggerp-pwa-v34';
 const ASSETS = [
   './',
   './index.html',
@@ -39,8 +39,13 @@ async function manualNetworkFirst(req) {
     if (res.status === 200) {
       const copy = res.clone();
       caches.open(MANUAL_CACHE).then((c) => c.put(key, copy)).catch(() => {});
+      return res;
     }
-    return res;
+    if (res.status === 206) return res;
+    // Servidor respondeu com erro (ex.: 404 com o GitHub Pages desligado):
+    // a copia guardada vale mais que a pagina de erro
+    const cached = await caches.match(key, { cacheName: MANUAL_CACHE });
+    return cached || res;
   } catch (err) {
     const cached = await caches.match(key, { cacheName: MANUAL_CACHE });
     if (cached) return cached;
